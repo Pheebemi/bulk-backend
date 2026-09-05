@@ -193,39 +193,54 @@ class CampaignListCreateView(generics.ListAPIView):
         # whole campaign when a late chunk fails would hand back money for
         # messages the provider has already delivered and billed us for,
         # so only the recipients that never went out are refunded.
+        #
+        # Termii's bulk endpoint can return HTTP 200 with a top-level
+        # code "ok" while its own body says some or all recipients in
+        # that chunk were rejected — confirmed live:
+        # {"code": "ok", "submitted": 0, "rejected": 1, ...} for a single
+        # invalid number. An HTTP success alone does NOT mean the chunk
+        # was sent; `submitted` is the number to trust. It doesn't say
+        # *which* recipients were rejected, only how many, so within a
+        # partially-rejected chunk the first `submitted` numbers are
+        # treated as sent and the rest as not — a best-effort split, not
+        # a verified per-recipient result.
+        extract_id = _extract_sendchamp_message_id if provider == 'sendchamp' else _extract_message_id
         sent: list[str] = []
-        responses: list[dict] = []
+        unsent: list[str] = []
+        logs: list[SMSLog] = []
         send_error: Exception | None = None
         for i in range(0, recipient_count, CHUNK_SIZE):
             chunk = recipients_numbers[i : i + CHUNK_SIZE]
             try:
                 if provider == 'sendchamp':
                     route = 'dnd' if data['channel'] == 'dnd' else 'non_dnd'
-                    responses.append(sendchamp.send_sms(chunk, sender_id, data['message'], route))
+                    response = sendchamp.send_sms(chunk, sender_id, data['message'], route)
+                    # No partial-accept signal observed/documented for
+                    # Sendchamp — SendchampClient already raises on any
+                    # non-success response, so a call that returns here
+                    # is treated as the whole chunk having gone out.
+                    delivered_count = len(chunk)
                 else:
-                    responses.append(termii.send_bulk(chunk, sender_id, data['message'], data['channel']))
+                    response = termii.send_bulk(chunk, sender_id, data['message'], data['channel'])
+                    delivered_count = response.get('submitted', len(chunk))
             except (TermiiError, SendchampError) as exc:
                 send_error = exc
+                unsent.extend(chunk)
+                logs.extend(SMSLog(campaign=campaign, recipient=n, status='FAILED') for n in chunk)
                 break
-            sent.extend(chunk)
 
-        unsent = recipients_numbers[len(sent) :]
-        extract_id = _extract_sendchamp_message_id if provider == 'sendchamp' else _extract_message_id
+            chunk_sent, chunk_unsent = chunk[:delivered_count], chunk[delivered_count:]
+            sent.extend(chunk_sent)
+            unsent.extend(chunk_unsent)
+            msg_id = extract_id(response)
+            logs.extend(SMSLog(campaign=campaign, recipient=n, provider_msg_id=msg_id, status='DELIVERED') for n in chunk_sent)
+            logs.extend(SMSLog(campaign=campaign, recipient=n, status='FAILED') for n in chunk_unsent)
 
-        # Both providers' bulk response carries one id per chunk, not per
-        # recipient, so a sent recipient is logged against the id of the
-        # chunk it went out in. Per-recipient status needs a delivery-report
-        # webhook, which does not exist yet.
-        logs = [
-            SMSLog(
-                campaign=campaign,
-                recipient=number,
-                provider_msg_id=extract_id(responses[i // CHUNK_SIZE]),
-                status='DELIVERED',
-            )
-            for i, number in enumerate(sent)
-        ]
-        logs += [SMSLog(campaign=campaign, recipient=n, status='FAILED') for n in unsent]
+        # Any chunk never attempted at all (loop broke early) still needs
+        # its recipients recorded as failed.
+        attempted = len(sent) + len(unsent)
+        logs.extend(SMSLog(campaign=campaign, recipient=n, status='FAILED') for n in recipients_numbers[attempted:])
+        unsent.extend(recipients_numbers[attempted:])
         SMSLog.objects.bulk_create(logs)
 
         if unsent:
