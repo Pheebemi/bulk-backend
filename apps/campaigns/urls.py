@@ -11,11 +11,13 @@ from .views import (
     CampaignDetailView,
     CampaignListCreateView,
     CampaignRetryView,
+    RateView,
     SenderIDListCreateView,
 )
 
 urlpatterns = [
     # User-facing
+    path('rate/', RateView.as_view(), name='rate'),
     path('sender-ids/', SenderIDListCreateView.as_view(), name='sender-id-list'),
     path('campaigns/', CampaignListCreateView.as_view(), name='campaign-list'),
     path('campaigns/<int:pk>/', CampaignDetailView.as_view(), name='campaign-detail'),

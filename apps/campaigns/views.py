@@ -224,6 +224,16 @@ def _refresh_campaign_from_termii(campaign: Campaign):
     campaign.save(update_fields=['status', 'total_recipients', 'delivered', 'failed', 'termii_cost'])
 
 
+class RateView(APIView):
+    """Read-only, any authenticated user — needed so the create-campaign
+    screen can show a real cost estimate before sending."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        return Response(PlatformRateSerializer(PlatformRate.current()).data)
+
+
 # --- Admin --------------------------------------------------------------------
 
 
