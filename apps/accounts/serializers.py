@@ -1,0 +1,43 @@
+from rest_framework import serializers
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+from .models import User, Wallet
+
+
+class SignupSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, min_length=8)
+
+    class Meta:
+        model = User
+        fields = ['email', 'password', 'full_name', 'phone_number']
+
+    def create(self, validated_data):
+        password = validated_data.pop('password')
+        user = User.objects.create_user(password=password, **validated_data)
+        Wallet.objects.create(user=user)
+        return user
+
+
+class UserSerializer(serializers.ModelSerializer):
+    balance = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'full_name', 'phone_number', 'is_staff', 'balance']
+
+    def get_balance(self, obj):
+        wallet = getattr(obj, 'wallet', None)
+        return str(wallet.balance) if wallet else None
+
+
+class LoginSerializer(TokenObtainPairSerializer):
+    """Reshapes SimpleJWT's {access, refresh} into {token, refresh, user}
+    to match the frontend's lib/api.ts contract."""
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        return {
+            'token': data['access'],
+            'refresh': data['refresh'],
+            'user': UserSerializer(self.user).data,
+        }
