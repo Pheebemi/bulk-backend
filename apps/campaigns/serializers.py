@@ -54,6 +54,23 @@ class CampaignSerializer(serializers.ModelSerializer):
             'total_cost', 'termii_cost', 'status', 'created_at', 'logs',
         ]
         read_only_fields = [f for f in fields if f not in ()]
+        # provider_error is deliberately excluded — this serializer is what
+        # a customer's own GET /api/campaigns/ and /campaigns/<id>/ return,
+        # and that field holds raw provider text ("Sendchamp ... Low
+        # balance") that names an internal vendor and isn't theirs to see.
+        # AdminCampaignSerializer below is the one that includes it.
+
+
+class AdminCampaignSerializer(CampaignSerializer):
+    """Same shape the customer gets, plus who it belongs to and, when a
+    send failed, the real reason — for the admin console's campaign
+    monitor, not returned to any customer-facing endpoint."""
+
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+
+    class Meta(CampaignSerializer.Meta):
+        fields = CampaignSerializer.Meta.fields + ['user_email', 'provider_error']
+        read_only_fields = fields
 
 
 class CampaignCreateSerializer(serializers.Serializer):

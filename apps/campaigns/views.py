@@ -17,6 +17,7 @@ from .models import Campaign, PlatformRate, SenderID, SMSLog
 from .permissions import IsAdmin
 from .serializers import (
     AdminCampaignCreateSerializer,
+    AdminCampaignSerializer,
     AdminSenderIDSerializer,
     CampaignCreateSerializer,
     CampaignSerializer,
@@ -447,6 +448,19 @@ class AdminWalletAdjustView(APIView):
             wallet.save(update_fields=['balance'])
             log_wallet_transaction(target_user, signed, reason)
         return Response({'balance': str(wallet.balance)})
+
+
+class AdminAllCampaignsListView(generics.ListAPIView):
+    """Every campaign on the platform — customer sends and admin's own —
+    for the admin console's monitor, distinct from
+    AdminCampaignListCreateView which only lists admin's own (that one
+    backs the Send screen's history, scoped on purpose)."""
+
+    serializer_class = AdminCampaignSerializer
+    permission_classes = [IsAdmin]
+
+    def get_queryset(self):
+        return Campaign.objects.select_related('user').order_by('-created_at')
 
 
 class AdminCampaignListCreateView(generics.ListAPIView):

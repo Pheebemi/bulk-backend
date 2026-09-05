@@ -3,6 +3,7 @@ from django.urls import path
 from apps.accounts.views import AdminUserListView
 
 from .views import (
+    AdminAllCampaignsListView,
     AdminCampaignListCreateView,
     AdminPlatformRateView,
     AdminSenderIDDetailView,
@@ -29,4 +30,5 @@ urlpatterns = [
     path('admin/users/', AdminUserListView.as_view(), name='admin-user-list'),
     path('admin/users/<int:user_id>/wallet/', AdminWalletAdjustView.as_view(), name='admin-wallet-adjust'),
     path('admin/campaigns/', AdminCampaignListCreateView.as_view(), name='admin-campaign-list'),
+    path('admin/all-campaigns/', AdminAllCampaignsListView.as_view(), name='admin-all-campaigns-list'),
 ]
