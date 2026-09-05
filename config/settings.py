@@ -120,3 +120,10 @@ FLUTTERWAVE_PUBLIC_KEY = config('FLUTTERWAVE_PUBLIC_KEY', default='')
 FLUTTERWAVE_BASE_URL = config('FLUTTERWAVE_BASE_URL', default='https://api.flutterwave.com/v3')
 # Set the same value as your Flutterwave dashboard's webhook "secret hash"
 FLUTTERWAVE_WEBHOOK_HASH = config('FLUTTERWAVE_WEBHOOK_HASH', default='')
+
+# Sendchamp — secondary SMS provider. Ships with default sender IDs
+# (Sendchamp, SAlert, SC-OTP) usable immediately, unlike Termii's, which
+# need 1-2 days of network approval. Useful as a fallback while a
+# customer's own sender ID is still pending.
+SENDCHAMP_API_KEY = config('SENDCHAMP_API_KEY', default='')
+SENDCHAMP_BASE_URL = config('SENDCHAMP_BASE_URL', default='https://api.sendchamp.com/api/v1')
