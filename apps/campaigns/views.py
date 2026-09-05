@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 from apps.accounts.models import Wallet
 from apps.accounts.utils import log_wallet_transaction
 from apps.contacts.models import ContactGroup
-from integrations.termii import TermiiError, ensure_phonebook, termii
+from integrations.termii import TermiiError, termii
 
 from .models import Campaign, PlatformRate, SenderID, SMSLog
 from .permissions import IsAdmin
@@ -103,14 +103,15 @@ class CampaignListCreateView(generics.ListAPIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        recipients_numbers = None
-        group = None
+        # Recipients always come out of our own database — a saved group's
+        # numbers and a manually typed list are the same thing by the time
+        # they reach Termii. Nothing is stored in a Termii phonebook.
         if data.get('group_id'):
             group = get_object_or_404(ContactGroup, id=data['group_id'], user=request.user)
-            recipient_count = group.contacts.count()
+            recipients_numbers = list(group.contacts.values_list('phone_number', flat=True))
         else:
-            recipients_numbers = data['manual_numbers']
-            recipient_count = len(recipients_numbers)
+            recipients_numbers = list(data['manual_numbers'])
+        recipient_count = len(recipients_numbers)
 
         if recipient_count == 0:
             return Response({'detail': 'No recipients selected.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -143,25 +144,32 @@ class CampaignListCreateView(generics.ListAPIView):
         )
 
         try:
-            if group is not None:
-                phonebook_id = ensure_phonebook(group)
-                result = termii.send_campaign(phonebook_id, data['sender_id'], data['message'], data['channel'])
-                campaign.termii_campaign_id = result.get('campaignId')
-                campaign.status = 'PROCESSING'
-                campaign.save(update_fields=['termii_campaign_id', 'status'])
-            else:
-                responses = termii.send_bulk_chunked(recipients_numbers, data['sender_id'], data['message'], data['channel'])
-                all_ok = all(r.get('code') == 'ok' for r in responses)
-                campaign.status = 'DELIVERED' if all_ok else 'FAILED'
-                campaign.delivered = recipient_count if all_ok else 0
-                campaign.failed = 0 if all_ok else recipient_count
-                # Termii's bulk-send response doesn't give per-recipient status,
-                # so every log shares the batch's overall outcome — the best
-                # granularity this endpoint's response actually offers.
-                SMSLog.objects.bulk_create(
-                    [SMSLog(campaign=campaign, recipient=n, status=campaign.status) for n in recipients_numbers]
+            responses = termii.send_bulk_chunked(recipients_numbers, data['sender_id'], data['message'], data['channel'])
+            # Reaching here means every chunk returned 2xx — TermiiClient
+            # raises TermiiError on any non-ok response, so the HTTP status
+            # is the authoritative signal rather than a body field whose
+            # name differs between Termii's API versions.
+            campaign.status = 'DELIVERED'
+            campaign.delivered = recipient_count
+            campaign.failed = 0
+            # Termii's bulk-send response carries one id per chunk, not per
+            # recipient, so each recipient is logged against the id of the
+            # chunk it went out in — the finest granularity this endpoint
+            # actually offers. Per-recipient status needs a delivery-report
+            # webhook, which does not exist yet.
+            logs = []
+            for i, number in enumerate(recipients_numbers):
+                chunk = responses[i // 100] if responses else {}
+                logs.append(
+                    SMSLog(
+                        campaign=campaign,
+                        recipient=number,
+                        provider_msg_id=_extract_message_id(chunk),
+                        status=campaign.status,
+                    )
                 )
-                campaign.save(update_fields=['status', 'delivered', 'failed'])
+            SMSLog.objects.bulk_create(logs)
+            campaign.save(update_fields=['status', 'delivered', 'failed'])
         except TermiiError as exc:
             campaign.status = 'FAILED'
             campaign.save(update_fields=['status'])
@@ -173,6 +181,19 @@ class CampaignListCreateView(generics.ListAPIView):
             return Response({'detail': f'Termii send failed: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
 
         return Response(CampaignSerializer(campaign).data, status=status.HTTP_201_CREATED)
+
+
+def _extract_message_id(response: dict) -> str | None:
+    """Termii has used several names for the id it returns on send
+    (message_id, messageId, id). Take whichever is present rather than
+    silently storing nothing if the shape shifts again."""
+    if not isinstance(response, dict):
+        return None
+    for key in ('message_id', 'messageId', 'id'):
+        value = response.get(key)
+        if value:
+            return str(value)[:100]
+    return None
 
 
 class CampaignDetailView(generics.RetrieveAPIView):
@@ -193,15 +214,15 @@ class CampaignRetryView(APIView):
 
     def post(self, request, campaign_id, *args, **kwargs):
         campaign = get_object_or_404(Campaign, id=campaign_id, user=request.user)
-        if campaign.status != 'FAILED' or not campaign.termii_campaign_id:
-            return Response({'detail': 'Only failed phonebook-based campaigns can be retried.'}, status=400)
-        try:
-            termii.retry_campaign(campaign.termii_campaign_id)
-        except TermiiError as exc:
-            return Response({'detail': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
-        campaign.status = 'PROCESSING'
-        campaign.save(update_fields=['status'])
-        return Response(CampaignSerializer(campaign).data)
+        # Retry existed for the Campaign API (phonebook) path, which ran
+        # asynchronously on Termii's side and could be re-kicked by id.
+        # Direct bulk sends resolve synchronously and a failed one is
+        # refunded in full at send time, so there is nothing to re-kick —
+        # the user simply sends again, and is charged again.
+        return Response(
+            {'detail': 'Retry is not available for direct sends. Create the campaign again to resend.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
 
 def _refresh_campaign_from_termii(campaign: Campaign):

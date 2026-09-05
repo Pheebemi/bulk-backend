@@ -37,17 +37,10 @@ class ContactCreateView(generics.CreateAPIView):
         group = generics.get_object_or_404(
             ContactGroup, id=self.kwargs['group_id'], user=self.request.user
         )
-        contact = serializer.save(group=group)
-        # Best-effort sync so the group's Termii phonebook stays current.
-        # Failures here don't block the contact being saved locally — the
-        # phonebook sync is retried the next time a campaign is sent to
-        # this group (see campaigns.views.CampaignCreateView).
-        try:
-            from integrations.termii import push_single_contact
-
-            push_single_contact(group, contact)
-        except Exception:
-            pass
+        serializer.save(group=group)
+        # No Termii sync: this database is the sole source of truth for
+        # contacts. Numbers are handed to Termii only at send time, as the
+        # recipient list of a bulk message — never stored in a phonebook.
 
 
 class ContactCsvUploadView(APIView):
@@ -78,12 +71,5 @@ class ContactCsvUploadView(APIView):
                 last_name=(row.get('last_name') or '').strip(),
             )
             created += 1
-
-        try:
-            from integrations.termii import sync_group_via_csv
-
-            sync_group_via_csv(group, raw_bytes, file.name)
-        except Exception:
-            pass
 
         return Response(ContactGroupSerializer(group).data, status=status.HTTP_201_CREATED)
