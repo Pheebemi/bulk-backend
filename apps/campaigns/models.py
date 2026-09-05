@@ -80,6 +80,13 @@ class Campaign(models.Model):
     total_cost = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))  # charged to user
     termii_cost = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))  # Termii's actual cost
     status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='PENDING')
+    # Raw provider error text on a FAILED/PARTIAL send (e.g. Termii or
+    # Sendchamp reporting their own account balance is exhausted) — admin
+    # diagnostic only. Never returned to the customer: the API response
+    # gives them a generic message instead, since a provider running low
+    # is our problem to fix, not something naming "Sendchamp" or "Termii"
+    # to a customer would help them understand or act on.
+    provider_error = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

@@ -17,9 +17,13 @@ class SMSLogInline(admin.TabularInline):
 
 @admin.register(Campaign)
 class CampaignAdmin(admin.ModelAdmin):
-    list_display = ['sender_id', 'user', 'channel', 'status', 'total_recipients', 'total_cost', 'termii_cost', 'created_at']
-    list_filter = ['status', 'channel', 'is_admin_campaign']
-    search_fields = ['sender_id', 'user__email', 'message']
+    list_display = ['sender_id', 'user', 'provider', 'channel', 'status', 'total_recipients', 'total_cost', 'termii_cost', 'created_at']
+    list_filter = ['status', 'channel', 'provider', 'is_admin_campaign']
+    # provider_error lets a FAILED/PARTIAL campaign's real cause (e.g. a
+    # provider account being out of balance) turn up by searching "balance"
+    # here, instead of digging through Vercel logs.
+    search_fields = ['sender_id', 'user__email', 'message', 'provider_error']
+    readonly_fields = ['provider_error']
     inlines = [SMSLogInline]
 
 

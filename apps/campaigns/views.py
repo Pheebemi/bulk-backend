@@ -262,10 +262,20 @@ class CampaignListCreateView(generics.ListAPIView):
         campaign.delivered = len(sent)
         campaign.failed = len(unsent)
         campaign.total_cost = Decimal(len(sent)) * unit_cost
-        campaign.save(update_fields=['status', 'delivered', 'failed', 'total_cost'])
+        if send_error:
+            campaign.provider_error = f'{provider}: {send_error}'
+        campaign.save(update_fields=['status', 'delivered', 'failed', 'total_cost', 'provider_error'])
 
         if not sent:
-            return Response({'detail': f'{provider.capitalize()} send failed: {send_error}'}, status=status.HTTP_502_BAD_GATEWAY)
+            # Deliberately generic: a provider account running low is our
+            # problem, not the customer's — their wallet was never
+            # actually spent (refunded above), and "Sendchamp"/"Termii"
+            # means nothing to them. The real reason is on the campaign
+            # for admin (Django admin, or GET this campaign as staff).
+            return Response(
+                {'detail': "We couldn't send this campaign right now. Your wallet was not charged — please try again shortly."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
 
         return Response(CampaignSerializer(campaign).data, status=status.HTTP_201_CREATED)
 
