@@ -28,6 +28,9 @@ from .utils import count_segments
 
 User = get_user_model()
 
+# Termii's bulk endpoint accepts at most 100 numbers per call.
+CHUNK_SIZE = 100
+
 
 # --- Sender IDs (user) -------------------------------------------------------
 
@@ -118,7 +121,10 @@ class CampaignListCreateView(generics.ListAPIView):
 
         segments = count_segments(data['message'])
         rate = PlatformRate.current().rate_for(data['channel'])
-        cost = Decimal(recipient_count) * segments * rate
+        # Per-recipient price is kept separate so a partial send can be
+        # refunded by the recipient, not all-or-nothing.
+        unit_cost = Decimal(segments) * rate
+        cost = Decimal(recipient_count) * unit_cost
 
         # Reserve the funds up front, inside a row lock, so two concurrent
         # sends from the same user can't both pass a stale balance check —
@@ -143,42 +149,65 @@ class CampaignListCreateView(generics.ListAPIView):
             status='PENDING',
         )
 
-        try:
-            responses = termii.send_bulk_chunked(recipients_numbers, data['sender_id'], data['message'], data['channel'])
-            # Reaching here means every chunk returned 2xx — TermiiClient
-            # raises TermiiError on any non-ok response, so the HTTP status
-            # is the authoritative signal rather than a body field whose
-            # name differs between Termii's API versions.
-            campaign.status = 'DELIVERED'
-            campaign.delivered = recipient_count
-            campaign.failed = 0
-            # Termii's bulk-send response carries one id per chunk, not per
-            # recipient, so each recipient is logged against the id of the
-            # chunk it went out in — the finest granularity this endpoint
-            # actually offers. Per-recipient status needs a delivery-report
-            # webhook, which does not exist yet.
-            logs = []
-            for i, number in enumerate(recipients_numbers):
-                chunk = responses[i // 100] if responses else {}
-                logs.append(
-                    SMSLog(
-                        campaign=campaign,
-                        recipient=number,
-                        provider_msg_id=_extract_message_id(chunk),
-                        status=campaign.status,
-                    )
+        # Send chunk by chunk, tracking what actually left. Refunding the
+        # whole campaign when a late chunk fails would hand back money for
+        # messages Termii has already delivered and billed us for, so only
+        # the recipients that never went out are refunded.
+        sent: list[str] = []
+        responses: list[dict] = []
+        send_error: TermiiError | None = None
+        for i in range(0, recipient_count, CHUNK_SIZE):
+            chunk = recipients_numbers[i : i + CHUNK_SIZE]
+            try:
+                responses.append(
+                    termii.send_bulk(chunk, data['sender_id'], data['message'], data['channel'])
                 )
-            SMSLog.objects.bulk_create(logs)
-            campaign.save(update_fields=['status', 'delivered', 'failed'])
-        except TermiiError as exc:
-            campaign.status = 'FAILED'
-            campaign.save(update_fields=['status'])
+            except TermiiError as exc:
+                send_error = exc
+                break
+            sent.extend(chunk)
+
+        unsent = recipients_numbers[len(sent) :]
+
+        # Termii's bulk response carries one id per chunk, not per recipient,
+        # so a sent recipient is logged against the id of the chunk it went
+        # out in. Per-recipient status needs a delivery-report webhook, which
+        # does not exist yet.
+        logs = [
+            SMSLog(
+                campaign=campaign,
+                recipient=number,
+                provider_msg_id=_extract_message_id(responses[i // CHUNK_SIZE]),
+                status='DELIVERED',
+            )
+            for i, number in enumerate(sent)
+        ]
+        logs += [SMSLog(campaign=campaign, recipient=n, status='FAILED') for n in unsent]
+        SMSLog.objects.bulk_create(logs)
+
+        if unsent:
+            refund = Decimal(len(unsent)) * unit_cost
             with transaction.atomic():
                 refund_wallet = Wallet.objects.select_for_update().get(user=request.user)
-                refund_wallet.balance += cost
+                refund_wallet.balance += refund
                 refund_wallet.save(update_fields=['balance'])
-                log_wallet_transaction(request.user, cost, 'Refund: campaign send failed')
-            return Response({'detail': f'Termii send failed: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
+                log_wallet_transaction(
+                    request.user, refund, f'Refund: {len(unsent)} of {recipient_count} recipients not sent'
+                )
+
+        if not sent:
+            campaign.status = 'FAILED'
+        elif unsent:
+            campaign.status = 'PARTIAL'
+        else:
+            campaign.status = 'DELIVERED'
+        campaign.delivered = len(sent)
+        campaign.failed = len(unsent)
+        campaign.total_cost = Decimal(len(sent)) * unit_cost
+        campaign.save(update_fields=['status', 'delivered', 'failed', 'total_cost'])
+
+        if not sent:
+            return Response({'detail': f'Termii send failed: {send_error}'}, status=status.HTTP_502_BAD_GATEWAY)
 
         return Response(CampaignSerializer(campaign).data, status=status.HTTP_201_CREATED)
 

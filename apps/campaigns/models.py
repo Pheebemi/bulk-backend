@@ -53,6 +53,9 @@ class Campaign(models.Model):
         ('PENDING', 'Pending'),
         ('PROCESSING', 'Processing'),
         ('DELIVERED', 'Delivered'),
+        # Some chunks reached Termii and some did not; the unsent
+        # recipients have been refunded.
+        ('PARTIAL', 'Partially delivered'),
         ('FAILED', 'Failed'),
     )
     CHANNEL_CHOICES = (('generic', 'Generic'), ('dnd', 'DND'))
