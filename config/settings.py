@@ -127,3 +127,9 @@ FLUTTERWAVE_WEBHOOK_HASH = config('FLUTTERWAVE_WEBHOOK_HASH', default='')
 # customer's own sender ID is still pending.
 SENDCHAMP_API_KEY = config('SENDCHAMP_API_KEY', default='')
 SENDCHAMP_BASE_URL = config('SENDCHAMP_BASE_URL', default='https://api.sendchamp.com/api/v1')
+
+# KudiSMS — third SMS provider, shared/instant sender ID (Darra), confirmed
+# live against this account: real balance, and the send endpoint validates
+# the sender ID before the recipient — Darra passes it cleanly.
+KUDISMS_API_KEY = config('KUDISMS_API_KEY', default='')
+KUDISMS_BASE_URL = config('KUDISMS_BASE_URL', default='https://my.kudisms.net')

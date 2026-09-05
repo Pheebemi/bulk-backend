@@ -11,7 +11,17 @@ from apps.accounts.models import Wallet
 from apps.accounts.utils import log_wallet_transaction
 from apps.contacts.models import ContactGroup
 from integrations.termii import TermiiError, termii
-from integrations.sendchamp import DEFAULT_SENDER_IDS, SendchampError, sendchamp
+from integrations.sendchamp import DEFAULT_SENDER_IDS as SENDCHAMP_SENDER_IDS, SendchampError, sendchamp
+from integrations.kudisms import DEFAULT_SENDER_IDS as KUDISMS_SENDER_IDS, KudiSMSError, kudisms
+
+# Every shared, no-approval-needed sender ID across all providers, mapped
+# to which one carries it. A name showing up here at all is what makes it
+# "shared" — see SenderIDListCreateView.list() and the provider check in
+# CampaignListCreateView.post().
+SHARED_SENDER_ID_PROVIDERS = {
+    **{name: 'sendchamp' for name in SENDCHAMP_SENDER_IDS},
+    **{name: 'kudisms' for name in KUDISMS_SENDER_IDS},
+}
 
 from .models import Campaign, PlatformRate, SenderID, SMSLog
 from .permissions import IsAdmin
@@ -49,8 +59,8 @@ class SenderIDListCreateView(generics.ListCreateAPIView):
     def list(self, request, *args, **kwargs):
         # The user's own requested sender IDs, exactly as before, plus the
         # shared ones every account can send from immediately — these
-        # aren't stored rows, just the same three names campaigns.views
-        # recognizes at send time (see DEFAULT_SENDER_IDS).
+        # aren't stored rows, just the names campaigns.views recognizes
+        # at send time (see SHARED_SENDER_ID_PROVIDERS).
         owned = SenderIDSerializer(self.get_queryset(), many=True).data
         shared = [
             {
@@ -61,7 +71,7 @@ class SenderIDListCreateView(generics.ListCreateAPIView):
                 'created_at': None,
                 'is_shared': True,
             }
-            for i, name in enumerate(DEFAULT_SENDER_IDS)
+            for i, name in enumerate(SHARED_SENDER_ID_PROVIDERS)
         ]
         return Response([*owned, *shared])
 
@@ -140,14 +150,14 @@ class CampaignListCreateView(generics.ListAPIView):
         if recipient_count == 0:
             return Response({'detail': 'No recipients selected.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Shared sender IDs (see integrations.sendchamp.DEFAULT_SENDER_IDS)
-        # need no per-account approval and route through Sendchamp. Any
-        # other name must be one of this user's own Termii-approved
-        # sender IDs — nothing here let a caller send under a name they
-        # don't own before this check existed.
+        # Shared sender IDs (see SHARED_SENDER_ID_PROVIDERS) need no
+        # per-account approval and route straight to whichever provider
+        # carries that name. Any other name must be one of this user's
+        # own Termii-approved sender IDs — nothing here let a caller send
+        # under a name they don't own before this check existed.
         sender_id = data['sender_id']
-        if sender_id in DEFAULT_SENDER_IDS:
-            provider = 'sendchamp'
+        if sender_id in SHARED_SENDER_ID_PROVIDERS:
+            provider = SHARED_SENDER_ID_PROVIDERS[sender_id]
         else:
             provider = 'termii'
             owns_active_id = SenderID.objects.filter(
@@ -205,7 +215,10 @@ class CampaignListCreateView(generics.ListAPIView):
         # partially-rejected chunk the first `submitted` numbers are
         # treated as sent and the rest as not — a best-effort split, not
         # a verified per-recipient result.
-        extract_id = _extract_sendchamp_message_id if provider == 'sendchamp' else _extract_message_id
+        extract_id = {
+            'sendchamp': _extract_sendchamp_message_id,
+            'kudisms': _extract_kudisms_message_id,
+        }.get(provider, _extract_message_id)
         sent: list[str] = []
         unsent: list[str] = []
         logs: list[SMSLog] = []
@@ -221,10 +234,17 @@ class CampaignListCreateView(generics.ListAPIView):
                     # non-success response, so a call that returns here
                     # is treated as the whole chunk having gone out.
                     delivered_count = len(chunk)
+                elif provider == 'kudisms':
+                    route = 'dnd' if data['channel'] == 'dnd' else 'generic'
+                    response = kudisms.send_sms(chunk, sender_id, data['message'], route)
+                    # Same reasoning as Sendchamp — KudiSMSClient raises
+                    # on any non-success response, and their response
+                    # shape carries no per-recipient/submitted count.
+                    delivered_count = len(chunk)
                 else:
                     response = termii.send_bulk(chunk, sender_id, data['message'], data['channel'])
                     delivered_count = response.get('submitted', len(chunk))
-            except (TermiiError, SendchampError) as exc:
+            except (TermiiError, SendchampError, KudiSMSError) as exc:
                 send_error = exc
                 unsent.extend(chunk)
                 logs.extend(SMSLog(campaign=campaign, recipient=n, status='FAILED') for n in chunk)
@@ -302,6 +322,26 @@ def _extract_sendchamp_message_id(response: dict) -> str | None:
     data = response.get('data') or {}
     value = data.get('id') or data.get('reference')
     return str(value)[:100] if value else None
+
+
+def _extract_kudisms_message_id(response: dict) -> str | None:
+    """KudiSMS's confirmed live response shape is unusual: data is a
+    one-element list holding a single string of comma-separated
+    "number|uuid" pairs, e.g.
+    ["234703xxxxx|fd2913aa-...,234703xxxxx|52d21697-..."] — one uuid per
+    recipient in the chunk, not one id for the whole call. Since delivery
+    tracking here is chunk-level either way (see the module note on
+    KudiSMS having no submitted/rejected-style count), this takes the
+    first pair's uuid as the chunk's representative id rather than
+    trying to map each uuid back to its own recipient."""
+    if not isinstance(response, dict):
+        return None
+    data = response.get('data')
+    if not isinstance(data, list) or not data or not isinstance(data[0], str):
+        return None
+    first_pair = data[0].split(',')[0]
+    _, _, uuid = first_pair.partition('|')
+    return uuid[:100] if uuid else None
 
 
 class CampaignDetailView(generics.RetrieveAPIView):
@@ -395,7 +435,7 @@ class AdminSenderIDListView(generics.ListAPIView):
                 'user_email': None,
                 'is_shared': True,
             }
-            for i, name in enumerate(DEFAULT_SENDER_IDS)
+            for i, name in enumerate(SHARED_SENDER_ID_PROVIDERS)
         ]
         return Response([*owned, *shared])
 

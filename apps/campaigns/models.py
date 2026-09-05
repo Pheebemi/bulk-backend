@@ -59,7 +59,7 @@ class Campaign(models.Model):
         ('FAILED', 'Failed'),
     )
     CHANNEL_CHOICES = (('generic', 'Generic'), ('dnd', 'DND'))
-    PROVIDER_CHOICES = (('termii', 'Termii'), ('sendchamp', 'Sendchamp'))
+    PROVIDER_CHOICES = (('termii', 'Termii'), ('sendchamp', 'Sendchamp'), ('kudisms', 'KudiSMS'))
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='campaigns')
     is_admin_campaign = models.BooleanField(default=False)
