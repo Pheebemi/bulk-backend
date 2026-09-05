@@ -10,11 +10,21 @@ class SenderID(models.Model):
         ('pending', 'Pending'),
         ('blocked', 'Blocked'),
     )
+    PROVIDER_CHOICES = (('termii', 'Termii'), ('sendchamp', 'Sendchamp'), ('kudisms', 'KudiSMS'))
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sender_ids')
     name = models.CharField(max_length=11)
-    # Synced from Termii's GET /api/sender-id (active/pending/blocked) —
-    # Termii's own team approves this, not our Admin. See PROJECT_SPEC.md §4.
+    # Which provider this name is actually registered with. Defaults to
+    # termii since every request still goes to Termii automatically (see
+    # SenderIDListCreateView.create); Admin flips this to sendchamp/kudisms
+    # by hand after submitting the name there directly — those providers
+    # have no request/status API to automate the way Termii's does.
+    provider = models.CharField(max_length=10, choices=PROVIDER_CHOICES, default='termii')
+    # For a termii-provider row: synced from Termii's GET /api/sender-id
+    # (active/pending/blocked) — Termii's own team approves this, not our
+    # Admin. See PROJECT_SPEC.md §4. For sendchamp/kudisms, there's no
+    # status API to sync from, so this is set by hand once Admin confirms
+    # approval directly on that provider's dashboard.
     platform_status = models.CharField(max_length=10, choices=PLATFORM_STATUS, default='pending')
     # DND whitelisting is a separate, manual step (Termii support) — not
     # covered by the Sender ID API at all. Admin flips this once confirmed.

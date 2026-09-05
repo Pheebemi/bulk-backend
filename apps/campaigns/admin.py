@@ -5,8 +5,8 @@ from .models import Campaign, PlatformRate, SenderID, SMSLog
 
 @admin.register(SenderID)
 class SenderIDAdmin(admin.ModelAdmin):
-    list_display = ['name', 'user', 'platform_status', 'termii_dnd_whitelisted', 'created_at']
-    list_filter = ['platform_status', 'termii_dnd_whitelisted']
+    list_display = ['name', 'user', 'provider', 'platform_status', 'termii_dnd_whitelisted', 'created_at']
+    list_filter = ['provider', 'platform_status', 'termii_dnd_whitelisted']
     search_fields = ['name', 'user__email']
 
 

@@ -116,10 +116,15 @@ def _sync_sender_id_statuses(queryset):
     update matching local rows by name. Termii's own team is the real
     approver — see PROJECT_SPEC.md §4.
 
-    Skipped entirely once every local row is already active/blocked —
-    there's nothing left that could still change, so there's no reason to
-    make a page load depend on Termii's API being up and fast."""
-    rows = list(queryset)
+    Only ever touches provider='termii' rows — a sendchamp/kudisms row
+    has no equivalent status API, so it stays exactly as Admin last set
+    it (see AdminSenderIDDetailView.patch) until they change it by hand.
+
+    Skipped entirely once every relevant local row is already
+    active/blocked — there's nothing left that could still change, so
+    there's no reason to make a page load depend on Termii's API being
+    up and fast."""
+    rows = [s for s in queryset if s.provider == 'termii']
     if not any(s.platform_status == 'pending' for s in rows):
         return
     try:
@@ -171,15 +176,18 @@ class CampaignListCreateView(generics.ListAPIView):
         if sender_id in SHARED_SENDER_ID_PROVIDERS:
             provider = SHARED_SENDER_ID_PROVIDERS[sender_id]
         else:
-            provider = 'termii'
-            owns_active_id = SenderID.objects.filter(
+            owned_sender_id = SenderID.objects.filter(
                 user=request.user, name=sender_id, platform_status='active'
-            ).exists()
-            if not owns_active_id:
+            ).first()
+            if not owned_sender_id:
                 return Response(
                     {'detail': f'"{sender_id}" is not an approved sender ID on your account.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+            # Whichever provider Admin actually approved it on — termii by
+            # default, or sendchamp/kudisms if Admin submitted it there by
+            # hand and flipped it active (see AdminSenderIDDetailView.patch).
+            provider = owned_sender_id.provider
 
         segments = count_segments(data['message'])
         rate = PlatformRate.current().rate_for(data['channel'])
@@ -455,11 +463,17 @@ class AdminSenderIDListView(generics.ListAPIView):
 
 
 class AdminSenderIDDetailView(APIView):
-    """The only real admin *action* on a Sender ID: recording that Termii's
-    support has confirmed DND whitelisting for it (see PROJECT_SPEC.md §4 —
-    Termii's own team decides platform_status via GET /api/sender-id, not
-    us; this flag is the one thing we do decide, manually, once they've
-    told us)."""
+    """Two things Admin can do to a Sender ID row by hand:
+
+    - Record that Termii's support has confirmed DND whitelisting for it
+      (see PROJECT_SPEC.md §4 — Termii's own team decides platform_status
+      via GET /api/sender-id for a termii-provider row, not us; this flag
+      is the one thing we do decide, manually, once they've told us).
+    - Approve a sendchamp/kudisms request: Admin submits the name on that
+      provider's own dashboard directly (no request/status API for either
+      exists), and once it's confirmed there, sets provider + status here
+      — from that point it's usable only by the user who requested it.
+    """
 
     permission_classes = [IsAdmin]
 
@@ -469,6 +483,21 @@ class AdminSenderIDDetailView(APIView):
         if whitelisted is not None:
             sender_id.termii_dnd_whitelisted = bool(whitelisted)
             sender_id.save(update_fields=['termii_dnd_whitelisted'])
+
+        provider = request.data.get('provider')
+        if provider is not None:
+            if provider not in dict(SenderID.PROVIDER_CHOICES):
+                return Response({'detail': f'"{provider}" is not a valid provider.'}, status=status.HTTP_400_BAD_REQUEST)
+            sender_id.provider = provider
+            sender_id.save(update_fields=['provider'])
+
+        platform_status = request.data.get('platform_status')
+        if platform_status is not None:
+            if platform_status not in dict(SenderID.PLATFORM_STATUS):
+                return Response({'detail': f'"{platform_status}" is not a valid status.'}, status=status.HTTP_400_BAD_REQUEST)
+            sender_id.platform_status = platform_status
+            sender_id.save(update_fields=['platform_status'])
+
         return Response(AdminSenderIDSerializer(sender_id).data)
 
 

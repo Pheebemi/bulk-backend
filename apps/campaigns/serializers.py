@@ -11,8 +11,8 @@ class SenderIDSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SenderID
-        fields = ['id', 'name', 'platform_status', 'termii_dnd_whitelisted', 'created_at', 'is_shared']
-        read_only_fields = ['platform_status', 'termii_dnd_whitelisted', 'created_at', 'is_shared']
+        fields = ['id', 'name', 'provider', 'platform_status', 'termii_dnd_whitelisted', 'created_at', 'is_shared']
+        read_only_fields = ['provider', 'platform_status', 'termii_dnd_whitelisted', 'created_at', 'is_shared']
 
     def get_is_shared(self, obj):
         return False
@@ -25,8 +25,12 @@ class AdminSenderIDSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SenderID
-        fields = ['id', 'name', 'platform_status', 'termii_dnd_whitelisted', 'created_at', 'user_email', 'is_shared']
-        read_only_fields = ['platform_status', 'created_at', 'user_email', 'is_shared']
+        fields = ['id', 'name', 'provider', 'platform_status', 'termii_dnd_whitelisted', 'created_at', 'user_email', 'is_shared']
+        # provider and platform_status are writable here on purpose —
+        # AdminSenderIDDetailView.patch is where Admin manually approves a
+        # sendchamp/kudisms request, since those providers have no status
+        # API to sync from automatically.
+        read_only_fields = ['created_at', 'user_email', 'is_shared']
 
     def get_is_shared(self, obj):
         return False
