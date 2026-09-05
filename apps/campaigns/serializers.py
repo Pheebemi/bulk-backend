@@ -47,6 +47,19 @@ class CampaignCreateSerializer(serializers.Serializer):
         return attrs
 
 
+class AdminCampaignCreateSerializer(serializers.Serializer):
+    sender_id = serializers.CharField(max_length=11)
+    message = serializers.CharField()
+    channel = serializers.ChoiceField(choices=['generic', 'dnd'])
+    manual_numbers = serializers.ListField(child=serializers.CharField(), required=False)
+    recipient_count = serializers.IntegerField(required=False, min_value=0)
+
+    def validate(self, attrs):
+        if not attrs.get('manual_numbers') and not attrs.get('recipient_count'):
+            raise serializers.ValidationError('Provide either manual_numbers or recipient_count.')
+        return attrs
+
+
 class PlatformRateSerializer(serializers.ModelSerializer):
     class Meta:
         model = PlatformRate

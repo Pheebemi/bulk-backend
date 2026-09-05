@@ -1,3 +1,4 @@
+import hmac
 from decimal import Decimal
 
 from django.conf import settings
@@ -13,18 +14,20 @@ from .models import PaymentTransaction
 
 def _credit_wallet_if_new(user, tx_ref: str, transaction_id: str, amount: Decimal) -> PaymentTransaction:
     """Idempotent: if this tx_ref was already recorded, don't credit twice —
-    both the client-verify call and the webhook can land on the same tx_ref."""
-    existing = PaymentTransaction.objects.filter(tx_ref=tx_ref).first()
-    if existing:
-        return existing
-
-    record = PaymentTransaction.objects.create(
-        user=user, tx_ref=tx_ref, flutterwave_transaction_id=transaction_id, amount=amount, status='successful'
+    both the client-verify call and the webhook can land on the same tx_ref,
+    at nearly the same moment. get_or_create (not filter-then-create) is
+    what makes this actually race-safe: Django retries as a get on the
+    IntegrityError from the unique tx_ref constraint, so the loser of the
+    race gets the winner's row back instead of crashing."""
+    record, created = PaymentTransaction.objects.get_or_create(
+        tx_ref=tx_ref,
+        defaults={'user': user, 'flutterwave_transaction_id': transaction_id, 'amount': amount, 'status': 'successful'},
     )
-    with transaction.atomic():
-        wallet = user.wallet
-        wallet.balance += amount
-        wallet.save(update_fields=['balance'])
+    if created:
+        with transaction.atomic():
+            wallet = user.wallet
+            wallet.balance += amount
+            wallet.save(update_fields=['balance'])
     return record
 
 
@@ -67,8 +70,8 @@ class FlutterwaveWebhookView(APIView):
     authentication_classes = []
 
     def post(self, request):
-        signature = request.headers.get('verif-hash')
-        if not signature or signature != settings.FLUTTERWAVE_WEBHOOK_HASH:
+        signature = request.headers.get('verif-hash') or ''
+        if not settings.FLUTTERWAVE_WEBHOOK_HASH or not hmac.compare_digest(signature, settings.FLUTTERWAVE_WEBHOOK_HASH):
             return Response(status=status.HTTP_401_UNAUTHORIZED)
 
         payload = request.data

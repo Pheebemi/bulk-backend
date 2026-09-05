@@ -175,16 +175,32 @@ termii = TermiiClient()
 
 
 def ensure_phonebook(group) -> str:
-    """Creates (and saves) group.termii_phonebook_id if it doesn't exist yet."""
-    if group.termii_phonebook_id:
-        return group.termii_phonebook_id
-    termii.create_phonebook(name=group.name)
-    phonebook_id = termii.find_phonebook_id_by_name(group.name)
-    if not phonebook_id:
-        raise TermiiError(f'Created phonebook "{group.name}" but could not find its id afterwards')
-    group.termii_phonebook_id = phonebook_id
-    group.save(update_fields=['termii_phonebook_id'])
-    return phonebook_id
+    """Creates (and saves) group.termii_phonebook_id if it doesn't exist yet.
+
+    Locks the group row for the duration of the check+create+save so two
+    concurrent callers (e.g. a CSV upload and a single contact add landing
+    at the same moment) can't both see an empty termii_phonebook_id and
+    each create a duplicate remote phonebook — the second caller blocks
+    until the first commits, then sees the id already set and skips
+    creating anything."""
+    from django.db import transaction
+
+    from apps.contacts.models import ContactGroup
+
+    with transaction.atomic():
+        locked_group = ContactGroup.objects.select_for_update().get(pk=group.pk)
+        if locked_group.termii_phonebook_id:
+            group.termii_phonebook_id = locked_group.termii_phonebook_id
+            return locked_group.termii_phonebook_id
+
+        termii.create_phonebook(name=locked_group.name)
+        phonebook_id = termii.find_phonebook_id_by_name(locked_group.name)
+        if not phonebook_id:
+            raise TermiiError(f'Created phonebook "{locked_group.name}" but could not find its id afterwards')
+        locked_group.termii_phonebook_id = phonebook_id
+        locked_group.save(update_fields=['termii_phonebook_id'])
+        group.termii_phonebook_id = phonebook_id
+        return phonebook_id
 
 
 def sync_group_to_phonebook(group) -> str:

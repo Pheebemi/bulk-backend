@@ -14,6 +14,7 @@ from integrations.termii import TermiiError, ensure_phonebook, termii
 from .models import Campaign, PlatformRate, SenderID, SMSLog
 from .permissions import IsAdmin
 from .serializers import (
+    AdminCampaignCreateSerializer,
     CampaignCreateSerializer,
     CampaignSerializer,
     PlatformRateSerializer,
@@ -44,25 +45,41 @@ class SenderIDListCreateView(generics.ListCreateAPIView):
         name = serializer.validated_data['name'].upper()
         use_case = serializer.validated_data['use_case']
 
+        if SenderID.objects.filter(user=request.user, name=name).exists():
+            return Response({'detail': f'{name} has already been requested.'}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
             termii.request_sender_id(name, use_case, company=request.user.full_name or request.user.email)
         except TermiiError as exc:
             return Response({'detail': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
-        sender_id = SenderID.objects.create(user=request.user, name=name, platform_status='pending')
+        # get_or_create (not create()) so a genuine concurrent double-submit
+        # — both requests passing the .exists() check above before either
+        # commits — lands on the unique_together constraint safely instead
+        # of raising IntegrityError; the Termii request itself can still
+        # double-fire in that narrow race, which is an acceptable tradeoff
+        # (a duplicate review request) versus a 500 to the user.
+        sender_id, _ = SenderID.objects.get_or_create(user=request.user, name=name, defaults={'platform_status': 'pending'})
         return Response(SenderIDSerializer(sender_id).data, status=status.HTTP_201_CREATED)
 
 
 def _sync_sender_id_statuses(queryset):
     """Best-effort: pull real status from Termii's GET /api/sender-id and
     update matching local rows by name. Termii's own team is the real
-    approver — see PROJECT_SPEC.md §4."""
+    approver — see PROJECT_SPEC.md §4.
+
+    Skipped entirely once every local row is already active/blocked —
+    there's nothing left that could still change, so there's no reason to
+    make a page load depend on Termii's API being up and fast."""
+    rows = list(queryset)
+    if not any(s.platform_status == 'pending' for s in rows):
+        return
     try:
         data = termii.fetch_sender_ids()
     except TermiiError:
         return
     by_name = {item.get('sender_id'): item.get('status') for item in data.get('content', [])}
-    for sender_id in queryset:
+    for sender_id in rows:
         remote_status = by_name.get(sender_id.name)
         if remote_status and remote_status in dict(SenderID.PLATFORM_STATUS) and remote_status != sender_id.platform_status:
             sender_id.platform_status = remote_status
@@ -100,9 +117,17 @@ class CampaignListCreateView(generics.ListAPIView):
         rate = PlatformRate.current().rate_for(data['channel'])
         cost = Decimal(recipient_count) * segments * rate
 
-        wallet = request.user.wallet
-        if cost > wallet.balance:
-            return Response({'detail': 'Insufficient wallet balance.'}, status=status.HTTP_400_BAD_REQUEST)
+        # Reserve the funds up front, inside a row lock, so two concurrent
+        # sends from the same user can't both pass a stale balance check —
+        # whichever request gets here second sees the already-decremented
+        # balance. If the Termii call below fails, we refund (see except
+        # block) rather than holding the lock for the whole external call.
+        with transaction.atomic():
+            wallet = Wallet.objects.select_for_update().get(user=request.user)
+            if cost > wallet.balance:
+                return Response({'detail': 'Insufficient wallet balance.'}, status=status.HTTP_400_BAD_REQUEST)
+            wallet.balance -= cost
+            wallet.save(update_fields=['balance'])
 
         campaign = Campaign.objects.create(
             user=request.user,
@@ -137,11 +162,11 @@ class CampaignListCreateView(generics.ListAPIView):
         except TermiiError as exc:
             campaign.status = 'FAILED'
             campaign.save(update_fields=['status'])
+            with transaction.atomic():
+                refund_wallet = Wallet.objects.select_for_update().get(user=request.user)
+                refund_wallet.balance += cost
+                refund_wallet.save(update_fields=['balance'])
             return Response({'detail': f'Termii send failed: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
-
-        with transaction.atomic():
-            wallet.balance -= cost
-            wallet.save(update_fields=['balance'])
 
         return Response(CampaignSerializer(campaign).data, status=status.HTTP_201_CREATED)
 
@@ -246,11 +271,11 @@ class AdminCampaignListCreateView(generics.ListAPIView):
         return Campaign.objects.filter(is_admin_campaign=True).order_by('-created_at')
 
     def post(self, request, *args, **kwargs):
-        serializer = CampaignCreateSerializer(data=request.data)
+        serializer = AdminCampaignCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         recipients_numbers = data.get('manual_numbers') or []
-        recipient_count = len(recipients_numbers) or int(request.data.get('recipient_count', 0))
+        recipient_count = len(recipients_numbers) or data.get('recipient_count', 0)
 
         if recipient_count == 0:
             return Response({'detail': 'No recipients selected.'}, status=status.HTTP_400_BAD_REQUEST)
