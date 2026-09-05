@@ -103,8 +103,9 @@ kudisms = KudiSMSClient()
 # by KudiSMS shortly after (same day) — POST /api/sms now returns
 # error_code 106 "The sender ID used does not exist." for it.
 #
-# Replaced same day with "algaddafhub" and "AT-HUB" — both confirmed
-# live via the same invalid-recipient probe used for Darra: validation
-# reached the recipient check (error 107 "Please provide a valid phone
-# number"), meaning the sender ID itself passed cleanly.
-DEFAULT_SENDER_IDS: tuple[str, ...] = ('algaddafhub', 'AT-HUB')
+# Replaced same day with "algaddafhub", "AT-HUB" and "Darrang" — all
+# confirmed live via the same invalid-recipient probe used for Darra:
+# validation reached the recipient check (error 107 "Please provide a
+# valid phone number") rather than error 106 (sender ID doesn't exist),
+# meaning each sender ID itself passed cleanly.
+DEFAULT_SENDER_IDS: tuple[str, ...] = ('algaddafhub', 'AT-HUB', 'Darrang')
