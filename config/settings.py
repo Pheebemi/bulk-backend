@@ -28,6 +28,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -81,6 +82,16 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
+# collectstatic writes here; the directory is committed so the Vercel
+# function has the admin's CSS/JS available at runtime (Vercel's Python
+# builder has no build step to run collectstatic for us).
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    # Compressed, but deliberately NOT the manifest variant: a manifest
+    # miss raises at request time, and an unstyled admin beats a 500.
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage'},
+}
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
