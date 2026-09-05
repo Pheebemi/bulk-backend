@@ -364,6 +364,30 @@ class AdminSenderIDListView(generics.ListAPIView):
         _sync_sender_id_statuses(qs)
         return qs
 
+    def list(self, request, *args, **kwargs):
+        # Same shared entries the customer-facing list adds (see
+        # SenderIDListCreateView.list) — the admin "send platform
+        # campaign" screen reads from this same list and needs them too.
+        # user_email is None: they aren't owned by any one account, so
+        # there's nothing to attribute them to. They have no real pk, so
+        # AdminSenderIDDetailView.patch (DND-whitelist) can't act on
+        # them — the approvals table filters is_shared rows out before
+        # rendering that action for exactly this reason.
+        owned = AdminSenderIDSerializer(self.get_queryset(), many=True).data
+        shared = [
+            {
+                'id': -(i + 1),
+                'name': name,
+                'platform_status': 'active',
+                'termii_dnd_whitelisted': True,
+                'created_at': None,
+                'user_email': None,
+                'is_shared': True,
+            }
+            for i, name in enumerate(DEFAULT_SENDER_IDS)
+        ]
+        return Response([*owned, *shared])
+
 
 class AdminSenderIDDetailView(APIView):
     """The only real admin *action* on a Sender ID: recording that Termii's

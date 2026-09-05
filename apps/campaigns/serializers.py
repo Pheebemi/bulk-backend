@@ -20,11 +20,16 @@ class SenderIDSerializer(serializers.ModelSerializer):
 
 class AdminSenderIDSerializer(serializers.ModelSerializer):
     user_email = serializers.EmailField(source='user.email', read_only=True)
+    # Always False here — same reasoning as SenderIDSerializer.is_shared.
+    is_shared = serializers.SerializerMethodField()
 
     class Meta:
         model = SenderID
-        fields = ['id', 'name', 'platform_status', 'termii_dnd_whitelisted', 'created_at', 'user_email']
-        read_only_fields = ['platform_status', 'created_at', 'user_email']
+        fields = ['id', 'name', 'platform_status', 'termii_dnd_whitelisted', 'created_at', 'user_email', 'is_shared']
+        read_only_fields = ['platform_status', 'created_at', 'user_email', 'is_shared']
+
+    def get_is_shared(self, obj):
+        return False
 
 
 class SenderIDRequestSerializer(serializers.Serializer):
