@@ -7,7 +7,7 @@ from .models import Campaign, PlatformRate, SenderID, SMSLog
 class SenderIDAdmin(admin.ModelAdmin):
     list_display = ['name', 'user', 'provider', 'platform_status', 'termii_dnd_whitelisted', 'created_at']
     list_filter = ['provider', 'platform_status', 'termii_dnd_whitelisted']
-    search_fields = ['name', 'user__email']
+    search_fields = ['name', 'user__email', 'use_case']
 
 
 class SMSLogInline(admin.TabularInline):

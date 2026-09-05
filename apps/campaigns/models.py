@@ -14,11 +14,19 @@ class SenderID(models.Model):
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sender_ids')
     name = models.CharField(max_length=11)
+    # What the customer told us they'll use this name for. Nothing calls
+    # an API with this — every request is submitted by Admin by hand, on
+    # whichever provider's own dashboard, so this is purely so Admin has
+    # the context to do that without asking the customer again.
+    use_case = models.TextField(blank=True)
     # Which provider this name is actually registered with. Defaults to
-    # termii since every request still goes to Termii automatically (see
-    # SenderIDListCreateView.create); Admin flips this to sendchamp/kudisms
-    # by hand after submitting the name there directly — those providers
-    # have no request/status API to automate the way Termii's does.
+    # termii, but nothing sets that automatically — Admin sets this (and
+    # platform_status) by hand once they've submitted the name on that
+    # provider's own dashboard and confirmed it's approved. None of
+    # Termii, Sendchamp or KudiSMS's request step is called by this
+    # codebase; only Termii's status *sync* is (see
+    # _sync_sender_id_statuses), for a provider='termii' row Admin
+    # submitted manually.
     provider = models.CharField(max_length=10, choices=PROVIDER_CHOICES, default='termii')
     # For a termii-provider row: synced from Termii's GET /api/sender-id
     # (active/pending/blocked) — Termii's own team approves this, not our

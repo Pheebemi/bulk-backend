@@ -96,18 +96,18 @@ class SenderIDListCreateView(generics.ListCreateAPIView):
         if SenderID.objects.filter(user=request.user, name=name).exists():
             return Response({'detail': f'{name} has already been requested.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            termii.request_sender_id(name, use_case, company=request.user.full_name or request.user.email)
-        except TermiiError as exc:
-            return Response({'detail': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
-
+        # Nothing is submitted to any provider here — Admin does that by
+        # hand, on whichever provider's dashboard they choose, once they've
+        # seen this request (see AdminSenderIDDetailView.patch). This just
+        # records that the customer asked, and why.
+        #
         # get_or_create (not create()) so a genuine concurrent double-submit
         # — both requests passing the .exists() check above before either
         # commits — lands on the unique_together constraint safely instead
-        # of raising IntegrityError; the Termii request itself can still
-        # double-fire in that narrow race, which is an acceptable tradeoff
-        # (a duplicate review request) versus a 500 to the user.
-        sender_id, _ = SenderID.objects.get_or_create(user=request.user, name=name, defaults={'platform_status': 'pending'})
+        # of raising IntegrityError.
+        sender_id, _ = SenderID.objects.get_or_create(
+            user=request.user, name=name, defaults={'platform_status': 'pending', 'use_case': use_case}
+        )
         return Response(SenderIDSerializer(sender_id).data, status=status.HTTP_201_CREATED)
 
 
