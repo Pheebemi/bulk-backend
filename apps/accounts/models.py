@@ -56,3 +56,21 @@ class Wallet(models.Model):
 
     def __str__(self):
         return f'{self.user.email} — ₦{self.balance}'
+
+
+class WalletTransaction(models.Model):
+    """A simple audit ledger — every balance change writes one row here
+    (funding, manual admin adjustment, campaign charge/refund) so the
+    admin wallet-management screen has real history to show, not just the
+    current balance."""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='wallet_transactions')
+    amount = models.DecimalField(max_digits=12, decimal_places=2)  # signed: +credit, -debit
+    description = models.CharField(max_length=200)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.user.email}: {self.amount} — {self.description}'

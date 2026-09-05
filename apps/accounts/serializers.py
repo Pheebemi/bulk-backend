@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import User, Wallet
+from .models import User, Wallet, WalletTransaction
 
 
 class SignupSerializer(serializers.ModelSerializer):
@@ -41,3 +41,29 @@ class LoginSerializer(TokenObtainPairSerializer):
             'refresh': data['refresh'],
             'user': UserSerializer(self.user).data,
         }
+
+
+class WalletTransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WalletTransaction
+        fields = ['id', 'amount', 'description', 'created_at']
+
+
+class AdminUserSerializer(serializers.ModelSerializer):
+    """Used by the admin wallet-management screen — includes balance and
+    recent transaction history, unlike the plain UserSerializer."""
+
+    balance = serializers.SerializerMethodField()
+    history = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'full_name', 'phone_number', 'balance', 'history']
+
+    def get_balance(self, obj):
+        wallet = getattr(obj, 'wallet', None)
+        return str(wallet.balance) if wallet else '0.00'
+
+    def get_history(self, obj):
+        qs = obj.wallet_transactions.all()[:20]
+        return WalletTransactionSerializer(qs, many=True).data

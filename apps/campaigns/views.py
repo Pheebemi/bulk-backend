@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import Wallet
+from apps.accounts.utils import log_wallet_transaction
 from apps.contacts.models import ContactGroup
 from integrations.termii import TermiiError, ensure_phonebook, termii
 
@@ -15,6 +16,7 @@ from .models import Campaign, PlatformRate, SenderID, SMSLog
 from .permissions import IsAdmin
 from .serializers import (
     AdminCampaignCreateSerializer,
+    AdminSenderIDSerializer,
     CampaignCreateSerializer,
     CampaignSerializer,
     PlatformRateSerializer,
@@ -128,6 +130,7 @@ class CampaignListCreateView(generics.ListAPIView):
                 return Response({'detail': 'Insufficient wallet balance.'}, status=status.HTTP_400_BAD_REQUEST)
             wallet.balance -= cost
             wallet.save(update_fields=['balance'])
+            log_wallet_transaction(request.user, -cost, f'Campaign: {data["message"][:40]}')
 
         campaign = Campaign.objects.create(
             user=request.user,
@@ -166,6 +169,7 @@ class CampaignListCreateView(generics.ListAPIView):
                 refund_wallet = Wallet.objects.select_for_update().get(user=request.user)
                 refund_wallet.balance += cost
                 refund_wallet.save(update_fields=['balance'])
+                log_wallet_transaction(request.user, cost, 'Refund: campaign send failed')
             return Response({'detail': f'Termii send failed: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
 
         return Response(CampaignSerializer(campaign).data, status=status.HTTP_201_CREATED)
@@ -224,13 +228,31 @@ def _refresh_campaign_from_termii(campaign: Campaign):
 
 
 class AdminSenderIDListView(generics.ListAPIView):
-    serializer_class = SenderIDSerializer
+    serializer_class = AdminSenderIDSerializer
     permission_classes = [IsAdmin]
 
     def get_queryset(self):
         qs = SenderID.objects.all().select_related('user')
         _sync_sender_id_statuses(qs)
         return qs
+
+
+class AdminSenderIDDetailView(APIView):
+    """The only real admin *action* on a Sender ID: recording that Termii's
+    support has confirmed DND whitelisting for it (see PROJECT_SPEC.md §4 —
+    Termii's own team decides platform_status via GET /api/sender-id, not
+    us; this flag is the one thing we do decide, manually, once they've
+    told us)."""
+
+    permission_classes = [IsAdmin]
+
+    def patch(self, request, pk):
+        sender_id = get_object_or_404(SenderID, pk=pk)
+        whitelisted = request.data.get('termii_dnd_whitelisted')
+        if whitelisted is not None:
+            sender_id.termii_dnd_whitelisted = bool(whitelisted)
+            sender_id.save(update_fields=['termii_dnd_whitelisted'])
+        return Response(AdminSenderIDSerializer(sender_id).data)
 
 
 class AdminPlatformRateView(APIView):
@@ -257,9 +279,11 @@ class AdminWalletAdjustView(APIView):
         serializer.is_valid(raise_exception=True)
         amount = serializer.validated_data['amount']
         signed = amount if serializer.validated_data['direction'] == 'credit' else -amount
+        reason = serializer.validated_data.get('reason') or ('Manual credit' if signed > 0 else 'Manual debit')
         with transaction.atomic():
             wallet.balance += signed
             wallet.save(update_fields=['balance'])
+            log_wallet_transaction(target_user, signed, reason)
         return Response({'balance': str(wallet.balance)})
 
 

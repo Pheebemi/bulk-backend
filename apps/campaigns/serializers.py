@@ -10,6 +10,15 @@ class SenderIDSerializer(serializers.ModelSerializer):
         read_only_fields = ['platform_status', 'termii_dnd_whitelisted', 'created_at']
 
 
+class AdminSenderIDSerializer(serializers.ModelSerializer):
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+
+    class Meta:
+        model = SenderID
+        fields = ['id', 'name', 'platform_status', 'termii_dnd_whitelisted', 'created_at', 'user_email']
+        read_only_fields = ['platform_status', 'created_at', 'user_email']
+
+
 class SenderIDRequestSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=11)
     use_case = serializers.CharField()

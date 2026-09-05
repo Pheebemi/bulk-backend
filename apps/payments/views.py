@@ -7,6 +7,7 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.utils import log_wallet_transaction
 from integrations.flutterwave import FlutterwaveError, flutterwave
 
 from .models import PaymentTransaction
@@ -28,6 +29,7 @@ def _credit_wallet_if_new(user, tx_ref: str, transaction_id: str, amount: Decima
             wallet = user.wallet
             wallet.balance += amount
             wallet.save(update_fields=['balance'])
+            log_wallet_transaction(user, amount, 'Wallet funding (Flutterwave)')
     return record
 
 

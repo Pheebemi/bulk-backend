@@ -3,8 +3,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from apps.campaigns.permissions import IsAdmin
+
 from .models import User
-from .serializers import SignupSerializer, UserSerializer
+from .serializers import AdminUserSerializer, SignupSerializer, UserSerializer
 
 
 class SignupView(generics.CreateAPIView):
@@ -34,3 +36,11 @@ class MeView(APIView):
 
     def get(self, request):
         return Response(UserSerializer(request.user).data)
+
+
+class AdminUserListView(generics.ListAPIView):
+    serializer_class = AdminUserSerializer
+    permission_classes = [IsAdmin]
+
+    def get_queryset(self):
+        return User.objects.filter(is_staff=False).select_related('wallet').prefetch_related('wallet_transactions')

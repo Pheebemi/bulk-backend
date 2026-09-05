@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
-from .models import User, Wallet
+from .models import User, Wallet, WalletTransaction
 
 
 class UserAdmin(DjangoUserAdmin):
@@ -20,3 +20,4 @@ class UserAdmin(DjangoUserAdmin):
 
 admin.site.register(User, UserAdmin)
 admin.site.register(Wallet)
+admin.site.register(WalletTransaction)
