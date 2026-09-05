@@ -11,6 +11,7 @@ from apps.accounts.models import Wallet
 from apps.accounts.utils import log_wallet_transaction
 from apps.contacts.models import ContactGroup
 from integrations.termii import TermiiError, termii
+from integrations.sendchamp import DEFAULT_SENDER_IDS, SendchampError, sendchamp
 
 from .models import Campaign, PlatformRate, SenderID, SMSLog
 from .permissions import IsAdmin
@@ -43,6 +44,25 @@ class SenderIDListCreateView(generics.ListCreateAPIView):
         qs = SenderID.objects.filter(user=self.request.user)
         _sync_sender_id_statuses(qs)
         return qs
+
+    def list(self, request, *args, **kwargs):
+        # The user's own requested sender IDs, exactly as before, plus the
+        # shared ones every account can send from immediately — these
+        # aren't stored rows, just the same three names campaigns.views
+        # recognizes at send time (see DEFAULT_SENDER_IDS).
+        owned = SenderIDSerializer(self.get_queryset(), many=True).data
+        shared = [
+            {
+                'id': -(i + 1),
+                'name': name,
+                'platform_status': 'active',
+                'termii_dnd_whitelisted': True,
+                'created_at': None,
+                'is_shared': True,
+            }
+            for i, name in enumerate(DEFAULT_SENDER_IDS)
+        ]
+        return Response([*owned, *shared])
 
     def create(self, request, *args, **kwargs):
         serializer = SenderIDRequestSerializer(data=request.data)
@@ -119,6 +139,25 @@ class CampaignListCreateView(generics.ListAPIView):
         if recipient_count == 0:
             return Response({'detail': 'No recipients selected.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Shared sender IDs (see integrations.sendchamp.DEFAULT_SENDER_IDS)
+        # need no per-account approval and route through Sendchamp. Any
+        # other name must be one of this user's own Termii-approved
+        # sender IDs — nothing here let a caller send under a name they
+        # don't own before this check existed.
+        sender_id = data['sender_id']
+        if sender_id in DEFAULT_SENDER_IDS:
+            provider = 'sendchamp'
+        else:
+            provider = 'termii'
+            owns_active_id = SenderID.objects.filter(
+                user=request.user, name=sender_id, platform_status='active'
+            ).exists()
+            if not owns_active_id:
+                return Response(
+                    {'detail': f'"{sender_id}" is not an approved sender ID on your account.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         segments = count_segments(data['message'])
         rate = PlatformRate.current().rate_for(data['channel'])
         # Per-recipient price is kept separate so a partial send can be
@@ -141,7 +180,8 @@ class CampaignListCreateView(generics.ListAPIView):
 
         campaign = Campaign.objects.create(
             user=request.user,
-            sender_id=data['sender_id'],
+            provider=provider,
+            sender_id=sender_id,
             message=data['message'],
             channel=data['channel'],
             total_recipients=recipient_count,
@@ -151,33 +191,36 @@ class CampaignListCreateView(generics.ListAPIView):
 
         # Send chunk by chunk, tracking what actually left. Refunding the
         # whole campaign when a late chunk fails would hand back money for
-        # messages Termii has already delivered and billed us for, so only
-        # the recipients that never went out are refunded.
+        # messages the provider has already delivered and billed us for,
+        # so only the recipients that never went out are refunded.
         sent: list[str] = []
         responses: list[dict] = []
-        send_error: TermiiError | None = None
+        send_error: Exception | None = None
         for i in range(0, recipient_count, CHUNK_SIZE):
             chunk = recipients_numbers[i : i + CHUNK_SIZE]
             try:
-                responses.append(
-                    termii.send_bulk(chunk, data['sender_id'], data['message'], data['channel'])
-                )
-            except TermiiError as exc:
+                if provider == 'sendchamp':
+                    route = 'dnd' if data['channel'] == 'dnd' else 'non_dnd'
+                    responses.append(sendchamp.send_sms(chunk, sender_id, data['message'], route))
+                else:
+                    responses.append(termii.send_bulk(chunk, sender_id, data['message'], data['channel']))
+            except (TermiiError, SendchampError) as exc:
                 send_error = exc
                 break
             sent.extend(chunk)
 
         unsent = recipients_numbers[len(sent) :]
+        extract_id = _extract_sendchamp_message_id if provider == 'sendchamp' else _extract_message_id
 
-        # Termii's bulk response carries one id per chunk, not per recipient,
-        # so a sent recipient is logged against the id of the chunk it went
-        # out in. Per-recipient status needs a delivery-report webhook, which
-        # does not exist yet.
+        # Both providers' bulk response carries one id per chunk, not per
+        # recipient, so a sent recipient is logged against the id of the
+        # chunk it went out in. Per-recipient status needs a delivery-report
+        # webhook, which does not exist yet.
         logs = [
             SMSLog(
                 campaign=campaign,
                 recipient=number,
-                provider_msg_id=_extract_message_id(responses[i // CHUNK_SIZE]),
+                provider_msg_id=extract_id(responses[i // CHUNK_SIZE]),
                 status='DELIVERED',
             )
             for i, number in enumerate(sent)
@@ -207,7 +250,7 @@ class CampaignListCreateView(generics.ListAPIView):
         campaign.save(update_fields=['status', 'delivered', 'failed', 'total_cost'])
 
         if not sent:
-            return Response({'detail': f'Termii send failed: {send_error}'}, status=status.HTTP_502_BAD_GATEWAY)
+            return Response({'detail': f'{provider.capitalize()} send failed: {send_error}'}, status=status.HTTP_502_BAD_GATEWAY)
 
         return Response(CampaignSerializer(campaign).data, status=status.HTTP_201_CREATED)
 
@@ -223,6 +266,16 @@ def _extract_message_id(response: dict) -> str | None:
         if value:
             return str(value)[:100]
     return None
+
+
+def _extract_sendchamp_message_id(response: dict) -> str | None:
+    """Per Sendchamp's own Send SMS OpenAPI spec, a successful response
+    nests the id under data.id (data.reference carries the same value)."""
+    if not isinstance(response, dict):
+        return None
+    data = response.get('data') or {}
+    value = data.get('id') or data.get('reference')
+    return str(value)[:100] if value else None
 
 
 class CampaignDetailView(generics.RetrieveAPIView):

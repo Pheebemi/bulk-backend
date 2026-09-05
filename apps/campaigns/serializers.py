@@ -4,10 +4,18 @@ from .models import Campaign, PlatformRate, SenderID, SMSLog
 
 
 class SenderIDSerializer(serializers.ModelSerializer):
+    # Always False here — real DB rows are a user's own requested sender
+    # IDs. The shared, no-approval-needed ones are synthetic entries
+    # SenderIDListCreateView.list() adds alongside these, not stored rows.
+    is_shared = serializers.SerializerMethodField()
+
     class Meta:
         model = SenderID
-        fields = ['id', 'name', 'platform_status', 'termii_dnd_whitelisted', 'created_at']
-        read_only_fields = ['platform_status', 'termii_dnd_whitelisted', 'created_at']
+        fields = ['id', 'name', 'platform_status', 'termii_dnd_whitelisted', 'created_at', 'is_shared']
+        read_only_fields = ['platform_status', 'termii_dnd_whitelisted', 'created_at', 'is_shared']
+
+    def get_is_shared(self, obj):
+        return False
 
 
 class AdminSenderIDSerializer(serializers.ModelSerializer):
@@ -36,7 +44,7 @@ class CampaignSerializer(serializers.ModelSerializer):
     class Meta:
         model = Campaign
         fields = [
-            'id', 'is_admin_campaign', 'sender_id', 'message', 'channel',
+            'id', 'is_admin_campaign', 'provider', 'sender_id', 'message', 'channel',
             'termii_campaign_id', 'total_recipients', 'delivered', 'failed',
             'total_cost', 'termii_cost', 'status', 'created_at', 'logs',
         ]

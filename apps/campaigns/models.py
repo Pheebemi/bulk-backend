@@ -53,15 +53,21 @@ class Campaign(models.Model):
         ('PENDING', 'Pending'),
         ('PROCESSING', 'Processing'),
         ('DELIVERED', 'Delivered'),
-        # Some chunks reached Termii and some did not; the unsent
+        # Some chunks reached the provider and some did not; the unsent
         # recipients have been refunded.
         ('PARTIAL', 'Partially delivered'),
         ('FAILED', 'Failed'),
     )
     CHANNEL_CHOICES = (('generic', 'Generic'), ('dnd', 'DND'))
+    PROVIDER_CHOICES = (('termii', 'Termii'), ('sendchamp', 'Sendchamp'))
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='campaigns')
     is_admin_campaign = models.BooleanField(default=False)
+    # Which SMS provider actually carried this send — decided by whether
+    # sender_id was one of the shared, no-approval-needed names (see
+    # integrations.sendchamp.DEFAULT_SENDER_IDS) or a user's own approved
+    # Termii sender ID.
+    provider = models.CharField(max_length=10, choices=PROVIDER_CHOICES, default='termii')
     sender_id = models.CharField(max_length=11)
     message = models.TextField()
     channel = models.CharField(max_length=10, choices=CHANNEL_CHOICES, default='dnd')
