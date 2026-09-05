@@ -13,17 +13,21 @@ returned error 107 "Please provide a valid phone number" — validation
 reached the recipient check, meaning Darra itself passed sender-ID
 validation cleanly.
 
-Two things their docs don't state and this file doesn't invent:
-- The exact recipient-batch limit — CHUNK_SIZE below is the same
-  assumed-not-verified 100 used for Termii and Sendchamp, not a KudiSMS
-  number. Their docs do mention a "batch size of 100" error (code 108),
-  which at least confirms 100 is the right ballpark.
-- Which gateway value is the plain/non-DND route. Only gateway=2 (DND,
-  refunds on non-delivery) is named in their docs. gateway=1 also passes
-  sender-ID validation in a live probe (as do 0 and 3, so KudiSMS accepts
-  more values than are documented) — used here as generic on the
-  ordinary convention of 1 being the default route, not because KudiSMS
-  says so.
+The recipient-batch limit is confirmed, not assumed: KudiSMS's own error
+108 names it directly — "The total amount of recipients is more than
+the required batch size of 100."
+
+gateway=1 (this file's 'generic' route) is KudiSMS's **promotional SMS
+route** — confirmed by their support team reaching out directly on
+2026-09-05 after live test sends, warning that OTP/verification-style
+messages are not allowed on it at all. That's the likely real reason
+Darra (the original shared sender ID) got denied shortly after testing:
+the test messages read as OTP/verification content on a route that
+doesn't permit it. Since Reachly only ever sends bulk/marketing
+campaigns — genuinely promotional by nature — this route is the
+correct one for real customer traffic; it's ad-hoc test messages that
+need to avoid OTP-style wording ("verification code", "status check",
+etc.) to avoid tripping the same flag again.
 """
 
 from __future__ import annotations
