@@ -103,20 +103,9 @@ class KudiSMSClient:
 
 kudisms = KudiSMSClient()
 
-# Darra was confirmed live on this account on 2026-09-05, but was denied
-# by KudiSMS shortly after (same day) — POST /api/sms now returns
-# error_code 106 "The sender ID used does not exist." for it.
-#
-# Replaced same day with "algaddafhub", "AT-HUB" and "Darrang" — all
-# confirmed live via the same invalid-recipient probe used for Darra:
-# validation reached the recipient check (error 107 "Please provide a
-# valid phone number") rather than error 106 (sender ID doesn't exist),
-# meaning each sender ID itself passed cleanly.
-DEFAULT_SENDER_IDS: tuple[str, ...] = ('algaddafhub', 'AT-HUB', 'Darrang')
-
-# Also confirmed live the same way, but deliberately kept out of
-# DEFAULT_SENDER_IDS: these are for the admin console's own platform
-# sends only, not the customer-facing shared pool. See
-# ADMIN_ONLY_SENDER_ID_PROVIDERS in campaigns/views.py for where that
-# restriction is actually enforced.
-ADMIN_ONLY_SENDER_IDS: tuple[str, ...] = ('DAK', 'phee-dev')
+# Which sender IDs are shared/admin-only is no longer decided here — it
+# used to be two hardcoded tuples (DEFAULT_SENDER_IDS, ADMIN_ONLY_SENDER_IDS)
+# that needed a code change and deploy to touch. Now it's real SenderID
+# rows (see apps.campaigns.models.SenderID.visibility), managed from the
+# admin console's Sender IDs screen — this file only wraps the API calls
+# themselves.

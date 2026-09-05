@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
@@ -11,29 +12,8 @@ from apps.accounts.models import Wallet
 from apps.accounts.utils import log_wallet_transaction
 from apps.contacts.models import ContactGroup
 from integrations.termii import TermiiError, termii
-from integrations.sendchamp import DEFAULT_SENDER_IDS as SENDCHAMP_SENDER_IDS, SendchampError, sendchamp
-from integrations.kudisms import (
-    ADMIN_ONLY_SENDER_IDS,
-    DEFAULT_SENDER_IDS as KUDISMS_SENDER_IDS,
-    KudiSMSError,
-    kudisms,
-)
-
-# Every shared, no-approval-needed sender ID across all providers, mapped
-# to which one carries it. A name showing up here at all is what makes it
-# "shared" — see SenderIDListCreateView.list() and the provider check in
-# CampaignListCreateView.post().
-SHARED_SENDER_ID_PROVIDERS = {
-    **{name: 'sendchamp' for name in SENDCHAMP_SENDER_IDS},
-    **{name: 'kudisms' for name in KUDISMS_SENDER_IDS},
-}
-
-# Same idea, but never shown to customers — only AdminSenderIDListView and
-# AdminCampaignListCreateView consult this. Kept separate from
-# SHARED_SENDER_ID_PROVIDERS so a customer typing one of these names into
-# a campaign hits the normal "not an approved sender ID" rejection, same
-# as any other name they don't own.
-ADMIN_ONLY_SENDER_ID_PROVIDERS = {name: 'kudisms' for name in ADMIN_ONLY_SENDER_IDS}
+from integrations.sendchamp import SendchampError, sendchamp
+from integrations.kudisms import KudiSMSError, kudisms
 
 from .models import Campaign, PlatformRate, SenderID, SMSLog
 from .permissions import IsAdmin
@@ -69,23 +49,13 @@ class SenderIDListCreateView(generics.ListCreateAPIView):
         return qs
 
     def list(self, request, *args, **kwargs):
-        # The user's own requested sender IDs, exactly as before, plus the
-        # shared ones every account can send from immediately — these
-        # aren't stored rows, just the names campaigns.views recognizes
-        # at send time (see SHARED_SENDER_ID_PROVIDERS).
-        owned = SenderIDSerializer(self.get_queryset(), many=True).data
-        shared = [
-            {
-                'id': -(i + 1),
-                'name': name,
-                'platform_status': 'active',
-                'termii_dnd_whitelisted': True,
-                'created_at': None,
-                'is_shared': True,
-            }
-            for i, name in enumerate(SHARED_SENDER_ID_PROVIDERS)
-        ]
-        return Response([*owned, *shared])
+        # The user's own requested sender IDs, plus every active shared
+        # row every account can send from immediately — both are real
+        # SenderID rows now (see SenderID.visibility), Admin-managed from
+        # the admin console instead of a hardcoded list in code.
+        owned = self.get_queryset()
+        shared = SenderID.objects.filter(visibility='shared', platform_status='active')
+        return Response(SenderIDSerializer([*owned, *shared], many=True).data)
 
     def create(self, request, *args, **kwargs):
         serializer = SenderIDRequestSerializer(data=request.data)
@@ -167,27 +137,22 @@ class CampaignListCreateView(generics.ListAPIView):
         if recipient_count == 0:
             return Response({'detail': 'No recipients selected.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Shared sender IDs (see SHARED_SENDER_ID_PROVIDERS) need no
-        # per-account approval and route straight to whichever provider
-        # carries that name. Any other name must be one of this user's
-        # own Termii-approved sender IDs — nothing here let a caller send
-        # under a name they don't own before this check existed.
+        # A shared row (visibility='shared') needs no per-account approval
+        # and routes straight to whichever provider Admin registered it
+        # on; any other name must be this user's own approved sender ID
+        # (visibility='private', owned by them) — admin_only rows never
+        # match here, so a customer typing one of those hits the same
+        # rejection as any other name they don't own.
         sender_id = data['sender_id']
-        if sender_id in SHARED_SENDER_ID_PROVIDERS:
-            provider = SHARED_SENDER_ID_PROVIDERS[sender_id]
-        else:
-            owned_sender_id = SenderID.objects.filter(
-                user=request.user, name=sender_id, platform_status='active'
-            ).first()
-            if not owned_sender_id:
-                return Response(
-                    {'detail': f'"{sender_id}" is not an approved sender ID on your account.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            # Whichever provider Admin actually approved it on — termii by
-            # default, or sendchamp/kudisms if Admin submitted it there by
-            # hand and flipped it active (see AdminSenderIDDetailView.patch).
-            provider = owned_sender_id.provider
+        matched_sender_id = SenderID.objects.filter(name=sender_id, platform_status='active').filter(
+            Q(visibility='shared') | Q(visibility='private', user=request.user)
+        ).first()
+        if not matched_sender_id:
+            return Response(
+                {'detail': f'"{sender_id}" is not an approved sender ID on your account.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        provider = matched_sender_id.provider
 
         segments = count_segments(data['message'])
         rate = PlatformRate.current().rate_for(data['channel'])
@@ -426,79 +391,40 @@ class RateView(APIView):
 # --- Admin --------------------------------------------------------------------
 
 
-class AdminSenderIDListView(generics.ListAPIView):
+class AdminSenderIDListCreateView(generics.ListCreateAPIView):
+    """Every Sender ID row on the platform — private (with whoever owns
+    it), shared, and admin-only alike — with full create here and
+    edit/delete on AdminSenderIDDetailView. Replaces what used to be a
+    read-only list plus two hardcoded Python tuples
+    (integrations.sendchamp/kudisms.DEFAULT_SENDER_IDS,
+    integrations.kudisms.ADMIN_ONLY_SENDER_IDS) that needed a code change
+    and deploy to touch — now it's all real rows, managed from here."""
+
     serializer_class = AdminSenderIDSerializer
     permission_classes = [IsAdmin]
 
     def get_queryset(self):
-        qs = SenderID.objects.all().select_related('user')
+        qs = SenderID.objects.all().select_related('user').order_by('-created_at')
         _sync_sender_id_statuses(qs)
         return qs
 
-    def list(self, request, *args, **kwargs):
-        # Same shared entries the customer-facing list adds (see
-        # SenderIDListCreateView.list), plus the admin-only pool
-        # (ADMIN_ONLY_SENDER_ID_PROVIDERS) that customers never see — the
-        # admin "send platform campaign" screen is the only place either
-        # set is needed together.
-        # user_email is None: they aren't owned by any one account, so
-        # there's nothing to attribute them to. They have no real pk, so
-        # AdminSenderIDDetailView.patch (DND-whitelist) can't act on
-        # them — the approvals table filters is_shared rows out before
-        # rendering that action for exactly this reason.
-        owned = AdminSenderIDSerializer(self.get_queryset(), many=True).data
-        shared = [
-            {
-                'id': -(i + 1),
-                'name': name,
-                'platform_status': 'active',
-                'termii_dnd_whitelisted': True,
-                'created_at': None,
-                'user_email': None,
-                'is_shared': True,
-            }
-            for i, name in enumerate([*SHARED_SENDER_ID_PROVIDERS, *ADMIN_ONLY_SENDER_ID_PROVIDERS])
-        ]
-        return Response([*owned, *shared])
 
+class AdminSenderIDDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Full edit and delete for one Sender ID row, whatever its
+    visibility. Covers everything Admin decides by hand — provider,
+    platform_status, DND whitelisting, even reassigning visibility or
+    owner — since none of Termii, Sendchamp or KudiSMS's request/approval
+    steps are called by this codebase (see SenderID.provider's
+    docstring); Admin submits on the provider's own dashboard directly
+    and records the outcome here.
 
-class AdminSenderIDDetailView(APIView):
-    """Two things Admin can do to a Sender ID row by hand:
+    Delete removes the row outright. Campaign.sender_id is a plain
+    CharField, not a foreign key, so a campaign's history is unaffected
+    by deleting the SenderID row that sent it."""
 
-    - Record that Termii's support has confirmed DND whitelisting for it
-      (see PROJECT_SPEC.md §4 — Termii's own team decides platform_status
-      via GET /api/sender-id for a termii-provider row, not us; this flag
-      is the one thing we do decide, manually, once they've told us).
-    - Approve a sendchamp/kudisms request: Admin submits the name on that
-      provider's own dashboard directly (no request/status API for either
-      exists), and once it's confirmed there, sets provider + status here
-      — from that point it's usable only by the user who requested it.
-    """
-
+    queryset = SenderID.objects.all()
+    serializer_class = AdminSenderIDSerializer
     permission_classes = [IsAdmin]
-
-    def patch(self, request, pk):
-        sender_id = get_object_or_404(SenderID, pk=pk)
-        whitelisted = request.data.get('termii_dnd_whitelisted')
-        if whitelisted is not None:
-            sender_id.termii_dnd_whitelisted = bool(whitelisted)
-            sender_id.save(update_fields=['termii_dnd_whitelisted'])
-
-        provider = request.data.get('provider')
-        if provider is not None:
-            if provider not in dict(SenderID.PROVIDER_CHOICES):
-                return Response({'detail': f'"{provider}" is not a valid provider.'}, status=status.HTTP_400_BAD_REQUEST)
-            sender_id.provider = provider
-            sender_id.save(update_fields=['provider'])
-
-        platform_status = request.data.get('platform_status')
-        if platform_status is not None:
-            if platform_status not in dict(SenderID.PLATFORM_STATUS):
-                return Response({'detail': f'"{platform_status}" is not a valid status.'}, status=status.HTTP_400_BAD_REQUEST)
-            sender_id.platform_status = platform_status
-            sender_id.save(update_fields=['platform_status'])
-
-        return Response(AdminSenderIDSerializer(sender_id).data)
 
 
 class AdminPlatformRateView(APIView):
@@ -564,17 +490,15 @@ class AdminCampaignListCreateView(generics.ListAPIView):
             return Response({'detail': 'No recipients selected.'}, status=status.HTTP_400_BAD_REQUEST)
 
         sender_id = data['sender_id']
-        # Admin can send from the admin-only pool (DAK, phee-dev — never
-        # shown to customers), the same shared pool customers use, or one
-        # of their own Termii-approved sender IDs. No ownership check
-        # here, unlike CampaignListCreateView.post() — only IsAdmin can
-        # reach this view at all.
-        if sender_id in ADMIN_ONLY_SENDER_ID_PROVIDERS:
-            provider = ADMIN_ONLY_SENDER_ID_PROVIDERS[sender_id]
-        elif sender_id in SHARED_SENDER_ID_PROVIDERS:
-            provider = SHARED_SENDER_ID_PROVIDERS[sender_id]
-        else:
-            provider = 'termii'
+        # Admin can send from any active row regardless of visibility —
+        # admin_only, shared, or even a customer's private one — unlike
+        # CampaignListCreateView.post() there's no ownership check here,
+        # only IsAdmin can reach this view at all. Falls back to termii
+        # for a name with no matching row (shouldn't normally happen once
+        # every provider approval goes through AdminSenderIDDetailView,
+        # but matches this view's prior behavior rather than hard-failing).
+        matched_sender_id = SenderID.objects.filter(name=sender_id, platform_status='active').first()
+        provider = matched_sender_id.provider if matched_sender_id else 'termii'
 
         segments = count_segments(data['message'])
         # Reference cost only — admin sends aren't charged to any wallet.

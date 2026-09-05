@@ -11,13 +11,29 @@ class SenderID(models.Model):
         ('blocked', 'Blocked'),
     )
     PROVIDER_CHOICES = (('termii', 'Termii'), ('sendchamp', 'Sendchamp'), ('kudisms', 'KudiSMS'))
+    VISIBILITY_CHOICES = (
+        # Belongs to exactly one customer — the normal request flow.
+        ('private', 'Private'),
+        # Every customer can send from it immediately, no request needed —
+        # previously a hardcoded tuple (integrations.*.DEFAULT_SENDER_IDS),
+        # now a real row Admin creates/edits/deletes directly.
+        ('shared', 'Shared'),
+        # Only the admin console's own "send platform campaign" screen can
+        # use it — previously integrations.kudisms.ADMIN_ONLY_SENDER_IDS.
+        ('admin_only', 'Admin only'),
+    )
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sender_ids')
+    # Null for shared/admin_only rows — nobody in particular owns those.
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sender_ids', null=True, blank=True
+    )
     name = models.CharField(max_length=11)
+    visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default='private')
     # What the customer told us they'll use this name for. Nothing calls
     # an API with this — every request is submitted by Admin by hand, on
     # whichever provider's own dashboard, so this is purely so Admin has
-    # the context to do that without asking the customer again.
+    # the context to do that without asking the customer again. Blank for
+    # shared/admin_only rows, which Admin creates directly.
     use_case = models.TextField(blank=True)
     # Which provider this name is actually registered with. Defaults to
     # termii, but nothing sets that automatically — Admin sets this (and
@@ -40,7 +56,14 @@ class SenderID(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ['user', 'name']
+        constraints = [
+            # A customer can't request the same name twice.
+            models.UniqueConstraint(fields=['user', 'name'], condition=models.Q(user__isnull=False), name='unique_private_name_per_user'),
+            # Only one shared row can carry a given name at a time.
+            models.UniqueConstraint(fields=['name'], condition=models.Q(visibility='shared'), name='unique_shared_name'),
+            # Same, for the admin-only pool.
+            models.UniqueConstraint(fields=['name'], condition=models.Q(visibility='admin_only'), name='unique_admin_only_name'),
+        ]
 
     def __str__(self):
         return f'{self.name} ({self.platform_status})'

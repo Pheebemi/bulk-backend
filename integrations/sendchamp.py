@@ -81,6 +81,8 @@ class SendchampClient:
 
 sendchamp = SendchampClient()
 
-# Default sender IDs available without approval — confirmed live against
-# this account on 2026-09-05.
-DEFAULT_SENDER_IDS = ('Sendchamp', 'SAlert', 'SC-OTP')
+# Which sender IDs are shared/admin-only is no longer decided here — it
+# used to be a hardcoded DEFAULT_SENDER_IDS tuple that needed a code
+# change and deploy to touch. Now it's real SenderID rows (see
+# apps.campaigns.models.SenderID.visibility), managed from the admin
+# console's Sender IDs screen — this file only wraps the API calls.

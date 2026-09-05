@@ -7,7 +7,7 @@ from .views import (
     AdminCampaignListCreateView,
     AdminPlatformRateView,
     AdminSenderIDDetailView,
-    AdminSenderIDListView,
+    AdminSenderIDListCreateView,
     AdminWalletAdjustView,
     CampaignDetailView,
     CampaignListCreateView,
@@ -24,7 +24,7 @@ urlpatterns = [
     path('campaigns/<int:pk>/', CampaignDetailView.as_view(), name='campaign-detail'),
     path('campaigns/<int:campaign_id>/retry/', CampaignRetryView.as_view(), name='campaign-retry'),
     # Admin
-    path('admin/sender-ids/', AdminSenderIDListView.as_view(), name='admin-sender-id-list'),
+    path('admin/sender-ids/', AdminSenderIDListCreateView.as_view(), name='admin-sender-id-list'),
     path('admin/sender-ids/<int:pk>/', AdminSenderIDDetailView.as_view(), name='admin-sender-id-detail'),
     path('admin/rate/', AdminPlatformRateView.as_view(), name='admin-rate'),
     path('admin/users/', AdminUserListView.as_view(), name='admin-user-list'),
