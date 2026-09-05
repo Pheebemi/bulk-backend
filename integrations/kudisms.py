@@ -39,7 +39,8 @@ class KudiSMSError(Exception):
 
 
 class KudiSMSClient:
-    # Assumed, not confirmed — see module docstring.
+    # Confirmed by KudiSMS's own docs (error 108): "The total amount of
+    # recipients is more than the required batch size of 100."
     CHUNK_SIZE = 100
 
     def __init__(self, api_key: str | None = None, base_url: str | None = None):
@@ -98,6 +99,12 @@ class KudiSMSClient:
 
 kudisms = KudiSMSClient()
 
-# Shared sender ID available without approval — confirmed live against
-# this account on 2026-09-05.
-DEFAULT_SENDER_IDS = ('Darra',)
+# Darra was confirmed live on this account on 2026-09-05, but was denied
+# by KudiSMS shortly after (same day) — POST /api/sms now returns
+# error_code 106 "The sender ID used does not exist." for it.
+#
+# Replaced same day with "algaddafhub" and "AT-HUB" — both confirmed
+# live via the same invalid-recipient probe used for Darra: validation
+# reached the recipient check (error 107 "Please provide a valid phone
+# number"), meaning the sender ID itself passed cleanly.
+DEFAULT_SENDER_IDS: tuple[str, ...] = ('algaddafhub', 'AT-HUB')
