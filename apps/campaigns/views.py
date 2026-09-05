@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Q
@@ -34,6 +35,20 @@ User = get_user_model()
 
 # Termii's bulk endpoint accepts at most 100 numbers per call.
 CHUNK_SIZE = 100
+
+# Above this many recipients, CampaignListCreateView.post() doesn't send
+# inline — a single Vercel request has a hard duration ceiling (10s on
+# Hobby, up to 300s on Pro if configured), and enough chunks can blow
+# past that regardless of plan. Past this point the campaign is created
+# as PROCESSING and handed to process_campaign_batch instead, called
+# repeatedly by an external scheduler until it's done. Comfortably under
+# even Hobby's 10s for a single request finishing 20 chunks or fewer.
+ASYNC_SEND_THRESHOLD = 2000
+
+# How many chunks one process_campaign_batch call advances a single
+# campaign by. Keeps one tick's total duration bounded regardless of how
+# large the campaign is — the rest waits for the next tick.
+MAX_CHUNKS_PER_BATCH = 20
 
 
 # --- Sender IDs (user) -------------------------------------------------------
@@ -180,110 +195,164 @@ class CampaignListCreateView(generics.ListAPIView):
             sender_id=sender_id,
             message=data['message'],
             channel=data['channel'],
+            recipients=recipients_numbers,
+            unit_cost=unit_cost,
             total_recipients=recipient_count,
             total_cost=cost,
-            status='PENDING',
+            status='PROCESSING',
         )
 
-        # Send chunk by chunk, tracking what actually left. Refunding the
-        # whole campaign when a late chunk fails would hand back money for
-        # messages the provider has already delivered and billed us for,
-        # so only the recipients that never went out are refunded.
-        #
-        # Termii's bulk endpoint can return HTTP 200 with a top-level
-        # code "ok" while its own body says some or all recipients in
-        # that chunk were rejected — confirmed live:
-        # {"code": "ok", "submitted": 0, "rejected": 1, ...} for a single
-        # invalid number. An HTTP success alone does NOT mean the chunk
-        # was sent; `submitted` is the number to trust. It doesn't say
-        # *which* recipients were rejected, only how many, so within a
-        # partially-rejected chunk the first `submitted` numbers are
-        # treated as sent and the rest as not — a best-effort split, not
-        # a verified per-recipient result.
-        extract_id = {
-            'sendchamp': _extract_sendchamp_message_id,
-            'kudisms': _extract_kudisms_message_id,
-        }.get(provider, _extract_message_id)
-        sent: list[str] = []
-        unsent: list[str] = []
-        logs: list[SMSLog] = []
-        send_error: Exception | None = None
-        for i in range(0, recipient_count, CHUNK_SIZE):
-            chunk = recipients_numbers[i : i + CHUNK_SIZE]
-            try:
-                if provider == 'sendchamp':
-                    route = 'dnd' if data['channel'] == 'dnd' else 'non_dnd'
-                    response = sendchamp.send_sms(chunk, sender_id, data['message'], route)
-                    # No partial-accept signal observed/documented for
-                    # Sendchamp — SendchampClient already raises on any
-                    # non-success response, so a call that returns here
-                    # is treated as the whole chunk having gone out.
-                    delivered_count = len(chunk)
-                elif provider == 'kudisms':
-                    route = 'dnd' if data['channel'] == 'dnd' else 'generic'
-                    response = kudisms.send_sms(chunk, sender_id, data['message'], route)
-                    # Same reasoning as Sendchamp — KudiSMSClient raises
-                    # on any non-success response, and their response
-                    # shape carries no per-recipient/submitted count.
-                    delivered_count = len(chunk)
-                else:
-                    response = termii.send_bulk(chunk, sender_id, data['message'], data['channel'])
-                    delivered_count = response.get('submitted', len(chunk))
-            except (TermiiError, SendchampError, KudiSMSError) as exc:
-                send_error = exc
-                unsent.extend(chunk)
-                logs.extend(SMSLog(campaign=campaign, recipient=n, status='FAILED') for n in chunk)
-                break
+        if recipient_count > ASYNC_SEND_THRESHOLD:
+            # Too big to safely finish inside one request — leave it
+            # PROCESSING and let process_campaign_batch (called
+            # repeatedly by an external scheduler hitting POST
+            # /api/cron/process-campaigns/) advance it in bounded
+            # batches instead. The customer sees it climb via delivered/
+            # total_recipients on subsequent GETs, same fields either way.
+            return Response(CampaignSerializer(campaign).data, status=status.HTTP_202_ACCEPTED)
 
-            chunk_sent, chunk_unsent = chunk[:delivered_count], chunk[delivered_count:]
-            sent.extend(chunk_sent)
-            unsent.extend(chunk_unsent)
-            msg_id = extract_id(response)
-            logs.extend(SMSLog(campaign=campaign, recipient=n, provider_msg_id=msg_id, status='DELIVERED') for n in chunk_sent)
-            logs.extend(SMSLog(campaign=campaign, recipient=n, status='FAILED') for n in chunk_unsent)
+        # Small enough to finish right now, same as this always used to
+        # work — max_chunks=None processes every recipient in one go.
+        _send_campaign_batch(campaign, max_chunks=None)
+        _finalize_campaign(campaign)
 
-        # Any chunk never attempted at all (loop broke early) still needs
-        # its recipients recorded as failed.
-        attempted = len(sent) + len(unsent)
-        logs.extend(SMSLog(campaign=campaign, recipient=n, status='FAILED') for n in recipients_numbers[attempted:])
-        unsent.extend(recipients_numbers[attempted:])
-        SMSLog.objects.bulk_create(logs)
-
-        if unsent:
-            refund = Decimal(len(unsent)) * unit_cost
-            with transaction.atomic():
-                refund_wallet = Wallet.objects.select_for_update().get(user=request.user)
-                refund_wallet.balance += refund
-                refund_wallet.save(update_fields=['balance'])
-                log_wallet_transaction(
-                    request.user, refund, f'Refund: {len(unsent)} of {recipient_count} recipients not sent'
-                )
-
-        if not sent:
-            campaign.status = 'FAILED'
-        elif unsent:
-            campaign.status = 'PARTIAL'
-        else:
-            campaign.status = 'DELIVERED'
-        campaign.delivered = len(sent)
-        campaign.failed = len(unsent)
-        campaign.total_cost = Decimal(len(sent)) * unit_cost
-        if send_error:
-            campaign.provider_error = f'{provider}: {send_error}'
-        campaign.save(update_fields=['status', 'delivered', 'failed', 'total_cost', 'provider_error'])
-
-        if not sent:
+        if campaign.status == 'FAILED':
             # Deliberately generic: a provider account running low is our
             # problem, not the customer's — their wallet was never
-            # actually spent (refunded above), and "Sendchamp"/"Termii"
-            # means nothing to them. The real reason is on the campaign
-            # for admin (Django admin, or GET this campaign as staff).
+            # actually spent (refunded in _finalize_campaign), and
+            # "Sendchamp"/"Termii" means nothing to them. The real reason
+            # is on the campaign for admin (Django admin, or GET this
+            # campaign as staff).
             return Response(
                 {'detail': "We couldn't send this campaign right now. Your wallet was not charged — please try again shortly."},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
         return Response(CampaignSerializer(campaign).data, status=status.HTTP_201_CREATED)
+
+
+def _send_campaign_batch(campaign: Campaign, *, max_chunks: int | None) -> bool:
+    """Sends chunks of campaign.recipients starting from
+    campaign.next_recipient_index, advancing it by at most max_chunks
+    chunks this call (None = keep going until every recipient's been
+    attempted or a hard provider error stops it — used for a small,
+    synchronous send; a bounded number is what a single
+    process_campaign_batch tick uses for a large, queued one).
+
+    Updates campaign.delivered/failed/next_recipient_index/
+    provider_error and writes SMSLog rows as it goes. Does NOT refund
+    unsent recipients or set a final status — call _finalize_campaign
+    once this returns True.
+
+    Returns True once every recipient has been attempted (sent or
+    failed) — either because the end of the list was reached, or a hard
+    provider error stopped it early, in which case everything from that
+    point on is marked failed immediately rather than left for a future
+    batch to retry (a hard error — bad credentials, provider account
+    suspended, network down — would likely just fail identically again).
+
+    Termii's bulk endpoint can return HTTP 200 with a top-level code "ok"
+    while its own body says some or all recipients in that chunk were
+    rejected — confirmed live: {"code": "ok", "submitted": 0, "rejected":
+    1, ...} for a single invalid number. An HTTP success alone does NOT
+    mean the chunk was sent; `submitted` is the number to trust. It
+    doesn't say *which* recipients were rejected, only how many, so
+    within a partially-rejected chunk the first `submitted` numbers are
+    treated as sent and the rest as not — a best-effort split, not a
+    verified per-recipient result. That partial case does NOT stop the
+    loop, unlike a hard error — the next chunk is still attempted.
+    """
+    provider = campaign.provider
+    recipients_numbers = campaign.recipients
+    recipient_count = len(recipients_numbers)
+    extract_id = {
+        'sendchamp': _extract_sendchamp_message_id,
+        'kudisms': _extract_kudisms_message_id,
+    }.get(provider, _extract_message_id)
+
+    logs: list[SMSLog] = []
+    delivered_delta = 0
+    failed_delta = 0
+    send_error: Exception | None = None
+    i = campaign.next_recipient_index
+    chunks_done = 0
+    while i < recipient_count and (max_chunks is None or chunks_done < max_chunks):
+        chunk = recipients_numbers[i : i + CHUNK_SIZE]
+        try:
+            if provider == 'sendchamp':
+                route = 'dnd' if campaign.channel == 'dnd' else 'non_dnd'
+                response = sendchamp.send_sms(chunk, campaign.sender_id, campaign.message, route)
+                # No partial-accept signal observed/documented for
+                # Sendchamp — SendchampClient already raises on any
+                # non-success response, so a call that returns here is
+                # treated as the whole chunk having gone out.
+                delivered_count = len(chunk)
+            elif provider == 'kudisms':
+                route = 'dnd' if campaign.channel == 'dnd' else 'generic'
+                response = kudisms.send_sms(chunk, campaign.sender_id, campaign.message, route)
+                # Same reasoning as Sendchamp — KudiSMSClient raises on
+                # any non-success response, and their response shape
+                # carries no per-recipient/submitted count.
+                delivered_count = len(chunk)
+            else:
+                response = termii.send_bulk(chunk, campaign.sender_id, campaign.message, campaign.channel)
+                delivered_count = response.get('submitted', len(chunk))
+        except (TermiiError, SendchampError, KudiSMSError) as exc:
+            send_error = exc
+            remaining = recipients_numbers[i:]
+            logs.extend(SMSLog(campaign=campaign, recipient=n, status='FAILED') for n in remaining)
+            failed_delta += len(remaining)
+            i = recipient_count
+            break
+
+        chunk_sent, chunk_unsent = chunk[:delivered_count], chunk[delivered_count:]
+        msg_id = extract_id(response)
+        logs.extend(SMSLog(campaign=campaign, recipient=n, provider_msg_id=msg_id, status='DELIVERED') for n in chunk_sent)
+        logs.extend(SMSLog(campaign=campaign, recipient=n, status='FAILED') for n in chunk_unsent)
+        delivered_delta += len(chunk_sent)
+        failed_delta += len(chunk_unsent)
+        i += len(chunk)
+        chunks_done += 1
+
+    SMSLog.objects.bulk_create(logs)
+    campaign.delivered += delivered_delta
+    campaign.failed += failed_delta
+    campaign.next_recipient_index = i
+    if send_error:
+        campaign.provider_error = f'{provider}: {send_error}'
+    campaign.save(update_fields=['delivered', 'failed', 'next_recipient_index', 'provider_error'])
+
+    return i >= recipient_count
+
+
+def _finalize_campaign(campaign: Campaign) -> None:
+    """Refunds whatever wasn't sent and sets the campaign's final status.
+    Call only once _send_campaign_batch has returned True (every
+    recipient attempted, whether by reaching the end or a hard error).
+    Clears `recipients` afterward — nothing needs the raw list again
+    once a campaign is done."""
+    sent_count = campaign.delivered
+    unsent_count = campaign.failed
+
+    if unsent_count:
+        refund = Decimal(unsent_count) * campaign.unit_cost
+        with transaction.atomic():
+            refund_wallet = Wallet.objects.select_for_update().get(user=campaign.user)
+            refund_wallet.balance += refund
+            refund_wallet.save(update_fields=['balance'])
+            log_wallet_transaction(
+                campaign.user, refund, f'Refund: {unsent_count} of {campaign.total_recipients} recipients not sent'
+            )
+
+    if not sent_count:
+        campaign.status = 'FAILED'
+    elif unsent_count:
+        campaign.status = 'PARTIAL'
+    else:
+        campaign.status = 'DELIVERED'
+    campaign.total_cost = Decimal(sent_count) * campaign.unit_cost
+    campaign.recipients = []
+    campaign.save(update_fields=['status', 'total_cost', 'recipients'])
 
 
 def _extract_message_id(response: dict) -> str | None:
@@ -386,6 +455,48 @@ class RateView(APIView):
 
     def get(self, request):
         return Response(PlatformRateSerializer(PlatformRate.current()).data)
+
+
+class ProcessQueuedCampaignsView(APIView):
+    """Advances every campaign still PROCESSING (see ASYNC_SEND_THRESHOLD
+    on CampaignListCreateView.post()) by up to MAX_CHUNKS_PER_BATCH
+    chunks each. Meant to be called roughly once a minute by an external
+    scheduler — NOT Vercel's own Cron, which on the Hobby plan is capped
+    at once/day, far too infrequent for this.
+
+    No user session involved — this isn't part of the customer or admin
+    API, so it's authenticated by a shared secret instead
+    (settings.CRON_SECRET) presented as a Bearer token, not a JWT.
+    """
+
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def post(self, request, *args, **kwargs):
+        # A blank CRON_SECRET means this is refused unconditionally,
+        # never treated as "no secret required" — an unset env var
+        # should not silently open this endpoint to the public internet.
+        expected = settings.CRON_SECRET
+        provided = request.headers.get('Authorization', '')
+        if not expected or provided != f'Bearer {expected}':
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        # Bounded so one slow campaign can't starve every other queued
+        # campaign of a turn this tick — oldest first, so a big campaign
+        # doesn't get stuck behind newer ones indefinitely either.
+        campaigns = Campaign.objects.filter(status='PROCESSING').order_by('created_at')[:5]
+        progress = []
+        for campaign in campaigns:
+            done = _send_campaign_batch(campaign, max_chunks=MAX_CHUNKS_PER_BATCH)
+            if done:
+                _finalize_campaign(campaign)
+            progress.append({
+                'id': campaign.id,
+                'done': done,
+                'sent_so_far': campaign.next_recipient_index,
+                'total_recipients': campaign.total_recipients,
+            })
+        return Response({'processed': progress})
 
 
 # --- Admin --------------------------------------------------------------------

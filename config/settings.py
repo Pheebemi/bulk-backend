@@ -133,3 +133,10 @@ SENDCHAMP_BASE_URL = config('SENDCHAMP_BASE_URL', default='https://api.sendchamp
 # the sender ID before the recipient — Darra passes it cleanly.
 KUDISMS_API_KEY = config('KUDISMS_API_KEY', default='')
 KUDISMS_BASE_URL = config('KUDISMS_BASE_URL', default='https://my.kudisms.net')
+
+# Shared secret an external scheduler (not Vercel's own Cron — Hobby caps
+# that at once/day, too infrequent for this) presents on every call to
+# POST /api/cron/process-campaigns/, checked as a Bearer token. Set to a
+# long random value in production; a blank default means the endpoint
+# rejects every call rather than silently allowing an unauthenticated one.
+CRON_SECRET = config('CRON_SECRET', default='')

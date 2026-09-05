@@ -12,6 +12,7 @@ from .views import (
     CampaignDetailView,
     CampaignListCreateView,
     CampaignRetryView,
+    ProcessQueuedCampaignsView,
     RateView,
     SenderIDListCreateView,
 )
@@ -23,6 +24,9 @@ urlpatterns = [
     path('campaigns/', CampaignListCreateView.as_view(), name='campaign-list'),
     path('campaigns/<int:pk>/', CampaignDetailView.as_view(), name='campaign-detail'),
     path('campaigns/<int:campaign_id>/retry/', CampaignRetryView.as_view(), name='campaign-retry'),
+    # Called by an external scheduler, not a browser — see
+    # ProcessQueuedCampaignsView's docstring.
+    path('cron/process-campaigns/', ProcessQueuedCampaignsView.as_view(), name='process-queued-campaigns'),
     # Admin
     path('admin/sender-ids/', AdminSenderIDListCreateView.as_view(), name='admin-sender-id-list'),
     path('admin/sender-ids/<int:pk>/', AdminSenderIDDetailView.as_view(), name='admin-sender-id-detail'),

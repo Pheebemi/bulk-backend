@@ -115,6 +115,24 @@ class Campaign(models.Model):
     # Set when sent via the Campaign API (phonebook path); null when sent via
     # the Messaging bulk endpoint instead (manual/ad-hoc recipient list).
     termii_campaign_id = models.CharField(max_length=100, blank=True, null=True)
+    # A snapshot of the resolved recipient list at send time (whether it
+    # came from a saved group or a manual list) — needed so a large
+    # campaign can be processed across several cron ticks (see
+    # views.process_campaign_batch) without re-deriving it from a group
+    # that might have changed since. Only ever grows a row for a large,
+    # queued campaign; a small synchronous one clears it once finalized
+    # (see _finalize_campaign) since nothing needs it again after that.
+    recipients = models.JSONField(default=list, blank=True)
+    # How many of `recipients` have been attempted (sent or failed) so
+    # far — a large campaign's resume point across multiple batches.
+    # Always equal to total_recipients by the time status leaves
+    # PROCESSING.
+    next_recipient_index = models.PositiveIntegerField(default=0)
+    # Per-recipient cost, snapshotted at send time — refund math (for
+    # whatever wasn't sent) uses this instead of re-reading
+    # PlatformRate.current(), so a rate change while a large campaign is
+    # still being processed across several batches can't skew the refund.
+    unit_cost = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     total_recipients = models.PositiveIntegerField(default=0)
     delivered = models.PositiveIntegerField(default=0)
     failed = models.PositiveIntegerField(default=0)
