@@ -12,7 +12,12 @@ from apps.accounts.utils import log_wallet_transaction
 from apps.contacts.models import ContactGroup
 from integrations.termii import TermiiError, termii
 from integrations.sendchamp import DEFAULT_SENDER_IDS as SENDCHAMP_SENDER_IDS, SendchampError, sendchamp
-from integrations.kudisms import DEFAULT_SENDER_IDS as KUDISMS_SENDER_IDS, KudiSMSError, kudisms
+from integrations.kudisms import (
+    ADMIN_ONLY_SENDER_IDS,
+    DEFAULT_SENDER_IDS as KUDISMS_SENDER_IDS,
+    KudiSMSError,
+    kudisms,
+)
 
 # Every shared, no-approval-needed sender ID across all providers, mapped
 # to which one carries it. A name showing up here at all is what makes it
@@ -22,6 +27,13 @@ SHARED_SENDER_ID_PROVIDERS = {
     **{name: 'sendchamp' for name in SENDCHAMP_SENDER_IDS},
     **{name: 'kudisms' for name in KUDISMS_SENDER_IDS},
 }
+
+# Same idea, but never shown to customers — only AdminSenderIDListView and
+# AdminCampaignListCreateView consult this. Kept separate from
+# SHARED_SENDER_ID_PROVIDERS so a customer typing one of these names into
+# a campaign hits the normal "not an approved sender ID" rejection, same
+# as any other name they don't own.
+ADMIN_ONLY_SENDER_ID_PROVIDERS = {name: 'kudisms' for name in ADMIN_ONLY_SENDER_IDS}
 
 from .models import Campaign, PlatformRate, SenderID, SMSLog
 from .permissions import IsAdmin
@@ -417,8 +429,10 @@ class AdminSenderIDListView(generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         # Same shared entries the customer-facing list adds (see
-        # SenderIDListCreateView.list) — the admin "send platform
-        # campaign" screen reads from this same list and needs them too.
+        # SenderIDListCreateView.list), plus the admin-only pool
+        # (ADMIN_ONLY_SENDER_ID_PROVIDERS) that customers never see — the
+        # admin "send platform campaign" screen is the only place either
+        # set is needed together.
         # user_email is None: they aren't owned by any one account, so
         # there's nothing to attribute them to. They have no real pk, so
         # AdminSenderIDDetailView.patch (DND-whitelist) can't act on
@@ -435,7 +449,7 @@ class AdminSenderIDListView(generics.ListAPIView):
                 'user_email': None,
                 'is_shared': True,
             }
-            for i, name in enumerate(SHARED_SENDER_ID_PROVIDERS)
+            for i, name in enumerate([*SHARED_SENDER_ID_PROVIDERS, *ADMIN_ONLY_SENDER_ID_PROVIDERS])
         ]
         return Response([*owned, *shared])
 
@@ -520,6 +534,19 @@ class AdminCampaignListCreateView(generics.ListAPIView):
         if recipient_count == 0:
             return Response({'detail': 'No recipients selected.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        sender_id = data['sender_id']
+        # Admin can send from the admin-only pool (DAK, phee-dev — never
+        # shown to customers), the same shared pool customers use, or one
+        # of their own Termii-approved sender IDs. No ownership check
+        # here, unlike CampaignListCreateView.post() — only IsAdmin can
+        # reach this view at all.
+        if sender_id in ADMIN_ONLY_SENDER_ID_PROVIDERS:
+            provider = ADMIN_ONLY_SENDER_ID_PROVIDERS[sender_id]
+        elif sender_id in SHARED_SENDER_ID_PROVIDERS:
+            provider = SHARED_SENDER_ID_PROVIDERS[sender_id]
+        else:
+            provider = 'termii'
+
         segments = count_segments(data['message'])
         # Reference cost only — admin sends aren't charged to any wallet.
         reference_rate = Decimal('6.00') if data['channel'] == 'generic' else Decimal('8.00')
@@ -527,7 +554,8 @@ class AdminCampaignListCreateView(generics.ListAPIView):
         campaign = Campaign.objects.create(
             user=request.user,
             is_admin_campaign=True,
-            sender_id=data['sender_id'],
+            provider=provider,
+            sender_id=sender_id,
             message=data['message'],
             channel=data['channel'],
             total_recipients=recipient_count,
@@ -538,10 +566,18 @@ class AdminCampaignListCreateView(generics.ListAPIView):
         )
         if recipients_numbers:
             try:
-                termii.send_bulk_chunked(recipients_numbers, data['sender_id'], data['message'], data['channel'])
-            except TermiiError as exc:
+                if provider == 'sendchamp':
+                    route = 'dnd' if data['channel'] == 'dnd' else 'non_dnd'
+                    sendchamp.send_bulk_chunked(recipients_numbers, sender_id, data['message'], route)
+                elif provider == 'kudisms':
+                    route = 'dnd' if data['channel'] == 'dnd' else 'generic'
+                    kudisms.send_bulk_chunked(recipients_numbers, sender_id, data['message'], route)
+                else:
+                    termii.send_bulk_chunked(recipients_numbers, sender_id, data['message'], data['channel'])
+            except (TermiiError, SendchampError, KudiSMSError) as exc:
                 campaign.status = 'FAILED'
-                campaign.save(update_fields=['status'])
-                return Response({'detail': f'Termii send failed: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
+                campaign.provider_error = f'{provider}: {exc}'
+                campaign.save(update_fields=['status', 'provider_error'])
+                return Response({'detail': f'{provider} send failed: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
 
         return Response(CampaignSerializer(campaign).data, status=status.HTTP_201_CREATED)

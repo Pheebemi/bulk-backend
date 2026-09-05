@@ -113,3 +113,10 @@ kudisms = KudiSMSClient()
 # valid phone number") rather than error 106 (sender ID doesn't exist),
 # meaning each sender ID itself passed cleanly.
 DEFAULT_SENDER_IDS: tuple[str, ...] = ('algaddafhub', 'AT-HUB', 'Darrang')
+
+# Also confirmed live the same way, but deliberately kept out of
+# DEFAULT_SENDER_IDS: these are for the admin console's own platform
+# sends only, not the customer-facing shared pool. See
+# ADMIN_ONLY_SENDER_ID_PROVIDERS in campaigns/views.py for where that
+# restriction is actually enforced.
+ADMIN_ONLY_SENDER_IDS: tuple[str, ...] = ('DAK', 'phee-dev')
