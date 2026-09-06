@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
@@ -562,6 +562,28 @@ class AdminPlatformRateView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+
+
+class AdminStatsView(APIView):
+    """Real aggregates for the admin dashboard's overview cards — total
+    users, total user balances, admin SMS sent. All three used to be
+    computed by summing/counting whatever was in an unpaginated list
+    fetched in full; now that AdminUserListView and
+    AdminCampaignListCreateView are paginated, that would silently only
+    cover whatever page happened to be loaded, so these are real DB
+    aggregates instead."""
+
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        total_users = User.objects.filter(is_staff=False).count()
+        total_balance = Wallet.objects.filter(user__is_staff=False).aggregate(total=Sum('balance'))['total'] or Decimal('0.00')
+        admin_sms_sent = Campaign.objects.filter(is_admin_campaign=True).aggregate(total=Sum('total_recipients'))['total'] or 0
+        return Response({
+            'total_users': total_users,
+            'total_balance': str(total_balance),
+            'admin_sms_sent': admin_sms_sent,
+        })
 
 
 class AdminWalletAdjustView(APIView):
