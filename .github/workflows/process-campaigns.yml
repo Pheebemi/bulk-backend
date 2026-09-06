@@ -1,0 +1,35 @@
+name: Process queued campaigns
+
+# Advances any campaign still "Processing" (see ASYNC_SEND_THRESHOLD in
+# apps/campaigns/views.py) — Vercel's own Cron on the Hobby plan this
+# project is on is capped at once/day, far too infrequent for this, so
+# GitHub Actions' schedule trigger stands in for it instead.
+#
+# 5 minutes is GitHub Actions' own documented minimum interval for a
+# scheduled workflow (and isn't a hard guarantee — it can slip further
+# during high GitHub-wide load). A campaign under ASYNC_SEND_THRESHOLD
+# is unaffected either way; it still sends immediately, inline, when
+# created.
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  # Lets you trigger a run by hand from the Actions tab, without waiting
+  # for the next scheduled tick — useful right after setting this up.
+  workflow_dispatch:
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call process-campaigns endpoint
+        run: |
+          status=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+            -X POST "https://bulk-backend.vercel.app/api/cron/process-campaigns/" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          echo "HTTP status: $status"
+          cat /tmp/response.json
+          echo ""
+          if [ "$status" != "200" ]; then
+            echo "::error::process-campaigns returned $status, expected 200"
+            exit 1
+          fi

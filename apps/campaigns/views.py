@@ -48,7 +48,16 @@ ASYNC_SEND_THRESHOLD = 2000
 # How many chunks one process_campaign_batch call advances a single
 # campaign by. Keeps one tick's total duration bounded regardless of how
 # large the campaign is — the rest waits for the next tick.
-MAX_CHUNKS_PER_BATCH = 20
+#
+# Kept low deliberately: a live timing check against KudiSMS's own API
+# from this environment showed one call taking 12.58s against a ~0.8s
+# typical — on Vercel Hobby's 10s default function ceiling, even a
+# single unlucky chunk in a batch can risk the whole tick. 5 keeps a
+# batch's expected total comfortably under that even with one slow call
+# in the mix, at the cost of needing more ticks to finish a huge
+# campaign — a real tradeoff, not free; Vercel Pro's configurable
+# maxDuration (up to 300s) would allow raising this safely.
+MAX_CHUNKS_PER_BATCH = 5
 
 
 # --- Sender IDs (user) -------------------------------------------------------
