@@ -1,3 +1,4 @@
+from django.db.models import Sum
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
@@ -20,14 +21,27 @@ class SignupSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     balance = serializers.SerializerMethodField()
+    # Real aggregates, computed server-side — the dashboard's "Campaigns
+    # sent" / "Recipients reached" stat cards used to just count/sum
+    # whatever page of GET /api/campaigns/ happened to be loaded, which
+    # was only ever correct by accident (it fetched all of them). Now
+    # that campaigns list is paginated, those need a real total instead.
+    campaigns_sent = serializers.SerializerMethodField()
+    recipients_reached = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'email', 'full_name', 'phone_number', 'is_staff', 'balance']
+        fields = ['id', 'email', 'full_name', 'phone_number', 'is_staff', 'balance', 'campaigns_sent', 'recipients_reached']
 
     def get_balance(self, obj):
         wallet = getattr(obj, 'wallet', None)
         return str(wallet.balance) if wallet else None
+
+    def get_campaigns_sent(self, obj):
+        return obj.campaigns.filter(is_admin_campaign=False).count()
+
+    def get_recipients_reached(self, obj):
+        return obj.campaigns.filter(is_admin_campaign=False).aggregate(total=Sum('total_recipients'))['total'] or 0
 
 
 class LoginSerializer(TokenObtainPairSerializer):
