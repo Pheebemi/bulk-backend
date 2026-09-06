@@ -193,3 +193,27 @@ class WalletAdjustSerializer(serializers.Serializer):
     amount = serializers.DecimalField(max_digits=12, decimal_places=2)
     reason = serializers.CharField(required=False, allow_blank=True)
     direction = serializers.ChoiceField(choices=['credit', 'debit'])
+
+
+class AdminUserSpendSerializer(serializers.ModelSerializer):
+    """One row of the admin analytics page's per-user distribution table.
+    Backed by annotated aggregates (see AdminUserSpendListView), not a
+    live relation lookup, so these read straight off the User instance
+    rather than through get_FOO_display-style serializer methods."""
+
+    total_spent = serializers.SerializerMethodField()
+    campaigns_count = serializers.SerializerMethodField()
+    recipients_total = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ['id', 'full_name', 'email', 'total_spent', 'campaigns_count', 'recipients_total']
+
+    def get_total_spent(self, obj):
+        return str(obj.total_spent or 0)
+
+    def get_campaigns_count(self, obj):
+        return obj.campaigns_count or 0
+
+    def get_recipients_total(self, obj):
+        return obj.recipients_total or 0

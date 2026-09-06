@@ -3,7 +3,8 @@ from decimal import Decimal
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.db.models import Q, Sum
+from django.db.models import Count, Q, Sum, Value
+from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
@@ -23,6 +24,7 @@ from .serializers import (
     AdminCampaignCreateSerializer,
     AdminCampaignSerializer,
     AdminSenderIDSerializer,
+    AdminUserSpendSerializer,
     CampaignCreateSerializer,
     CampaignDetailSerializer,
     CampaignSerializer,
@@ -584,6 +586,53 @@ class AdminStatsView(APIView):
             'total_balance': str(total_balance),
             'admin_sms_sent': admin_sms_sent,
         })
+
+
+class AdminAnalyticsView(APIView):
+    """Overview cards for the admin analytics page: what the admin's own
+    platform sends cost versus what customers actually spent from their
+    wallets. Admin sends carry no wallet charge (see
+    AdminCampaignListCreateView.post — total_cost stays a reference-rate
+    estimate, only tracked for reporting), so termii_cost — Termii's
+    real cost — is the honest "admin spend" figure, not total_cost."""
+
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        admin_agg = Campaign.objects.filter(is_admin_campaign=True).aggregate(
+            spend=Sum('termii_cost'), recipients=Sum('total_recipients')
+        )
+        user_agg = Campaign.objects.filter(is_admin_campaign=False).aggregate(
+            spend=Sum('total_cost'), recipients=Sum('total_recipients')
+        )
+        return Response({
+            'admin_spend': str(admin_agg['spend'] or Decimal('0.00')),
+            'admin_recipients': admin_agg['recipients'] or 0,
+            'user_spend': str(user_agg['spend'] or Decimal('0.00')),
+            'user_recipients': user_agg['recipients'] or 0,
+        })
+
+
+class AdminUserSpendListView(generics.ListAPIView):
+    """Per-user spend distribution backing the analytics page's table —
+    paginated so a growing user base doesn't mean fetching every user's
+    full campaign history just to show 25 rows."""
+
+    serializer_class = AdminUserSpendSerializer
+    permission_classes = [IsAdmin]
+    pagination_class = StandardResultsPagination
+
+    def get_queryset(self):
+        non_admin = Q(campaigns__is_admin_campaign=False)
+        return (
+            User.objects.filter(is_staff=False)
+            .annotate(
+                total_spent=Coalesce(Sum('campaigns__total_cost', filter=non_admin), Value(Decimal('0.00'))),
+                campaigns_count=Count('campaigns', filter=non_admin),
+                recipients_total=Coalesce(Sum('campaigns__total_recipients', filter=non_admin), Value(0)),
+            )
+            .order_by('-total_spent', '-recipients_total')
+        )
 
 
 class AdminWalletAdjustView(APIView):

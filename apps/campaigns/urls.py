@@ -4,11 +4,13 @@ from apps.accounts.views import AdminUserListView
 
 from .views import (
     AdminAllCampaignsListView,
+    AdminAnalyticsView,
     AdminCampaignListCreateView,
     AdminPlatformRateView,
     AdminSenderIDDetailView,
     AdminSenderIDListCreateView,
     AdminStatsView,
+    AdminUserSpendListView,
     AdminWalletAdjustView,
     CampaignDetailView,
     CampaignListCreateView,
@@ -33,6 +35,8 @@ urlpatterns = [
     path('admin/sender-ids/<int:pk>/', AdminSenderIDDetailView.as_view(), name='admin-sender-id-detail'),
     path('admin/rate/', AdminPlatformRateView.as_view(), name='admin-rate'),
     path('admin/stats/', AdminStatsView.as_view(), name='admin-stats'),
+    path('admin/analytics/', AdminAnalyticsView.as_view(), name='admin-analytics'),
+    path('admin/analytics/users/', AdminUserSpendListView.as_view(), name='admin-analytics-users'),
     path('admin/users/', AdminUserListView.as_view(), name='admin-user-list'),
     path('admin/users/<int:user_id>/wallet/', AdminWalletAdjustView.as_view(), name='admin-wallet-adjust'),
     path('admin/campaigns/', AdminCampaignListCreateView.as_view(), name='admin-campaign-list'),
