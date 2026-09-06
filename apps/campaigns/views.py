@@ -12,6 +12,7 @@ from rest_framework.views import APIView
 from apps.accounts.models import Wallet
 from apps.accounts.utils import log_wallet_transaction
 from apps.contacts.models import ContactGroup
+from config.pagination import StandardResultsPagination
 from integrations.termii import TermiiError, termii
 from integrations.sendchamp import SendchampError, sendchamp
 from integrations.kudisms import KudiSMSError, kudisms
@@ -23,6 +24,7 @@ from .serializers import (
     AdminCampaignSerializer,
     AdminSenderIDSerializer,
     CampaignCreateSerializer,
+    CampaignDetailSerializer,
     CampaignSerializer,
     PlatformRateSerializer,
     SenderIDRequestSerializer,
@@ -139,6 +141,7 @@ def _sync_sender_id_statuses(queryset):
 class CampaignListCreateView(generics.ListAPIView):
     serializer_class = CampaignSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardResultsPagination
 
     def get_queryset(self):
         return Campaign.objects.filter(user=self.request.user, is_admin_campaign=False).order_by('-created_at')
@@ -408,7 +411,7 @@ def _extract_kudisms_message_id(response: dict) -> str | None:
 
 
 class CampaignDetailView(generics.RetrieveAPIView):
-    serializer_class = CampaignSerializer
+    serializer_class = CampaignDetailSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
@@ -417,7 +420,7 @@ class CampaignDetailView(generics.RetrieveAPIView):
     def retrieve(self, request, *args, **kwargs):
         campaign = self.get_object()
         _refresh_campaign_from_termii(campaign)
-        return Response(CampaignSerializer(campaign).data)
+        return Response(CampaignDetailSerializer(campaign).data)
 
 
 class CampaignRetryView(APIView):
@@ -587,14 +590,23 @@ class AdminAllCampaignsListView(generics.ListAPIView):
 
     serializer_class = AdminCampaignSerializer
     permission_classes = [IsAdmin]
+    pagination_class = StandardResultsPagination
 
     def get_queryset(self):
-        return Campaign.objects.select_related('user').order_by('-created_at')
+        qs = Campaign.objects.select_related('user').order_by('-created_at')
+        # Done server-side, not by the frontend filtering a fetched page,
+        # since a fetched page is only ever a slice of the whole table
+        # now — filtering client-side would silently miss every failed
+        # campaign not on the currently-loaded page.
+        if self.request.query_params.get('status_group') == 'failed':
+            qs = qs.filter(status__in=['FAILED', 'PARTIAL'])
+        return qs
 
 
 class AdminCampaignListCreateView(generics.ListAPIView):
     serializer_class = CampaignSerializer
     permission_classes = [IsAdmin]
+    pagination_class = StandardResultsPagination
 
     def get_queryset(self):
         return Campaign.objects.filter(is_admin_campaign=True).order_by('-created_at')

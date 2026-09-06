@@ -1,9 +1,10 @@
-from rest_framework import generics, permissions
+from rest_framework import filters, generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.campaigns.permissions import IsAdmin
+from config.pagination import StandardResultsPagination
 
 from .models import User
 from .serializers import AdminUserSerializer, SignupSerializer, UserSerializer
@@ -41,6 +42,13 @@ class MeView(APIView):
 class AdminUserListView(generics.ListAPIView):
     serializer_class = AdminUserSerializer
     permission_classes = [IsAdmin]
+    pagination_class = StandardResultsPagination
+    # Server-side, not the frontend filtering an already-fetched page —
+    # a fetched page is only ever a slice of the whole user table now,
+    # so filtering client-side would silently miss every match not on
+    # the currently-loaded page. ?search= matches name or email.
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['full_name', 'email']
 
     def get_queryset(self):
         return User.objects.filter(is_staff=False).select_related('wallet').prefetch_related('wallet_transactions')

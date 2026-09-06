@@ -112,21 +112,36 @@ class SMSLogSerializer(serializers.ModelSerializer):
 
 
 class CampaignSerializer(serializers.ModelSerializer):
-    logs = SMSLogSerializer(many=True, read_only=True)
+    """The list shape — every campaign-list endpoint (customer's own,
+    admin's own, admin's platform-wide monitor) uses this. Deliberately
+    has no per-recipient `logs`: a large campaign can have thousands of
+    SMSLog rows, and nothing on any list page reads them — see
+    CampaignDetailSerializer below for where that data actually belongs."""
 
     class Meta:
         model = Campaign
         fields = [
             'id', 'is_admin_campaign', 'provider', 'sender_id', 'message', 'channel',
             'termii_campaign_id', 'total_recipients', 'delivered', 'failed',
-            'total_cost', 'termii_cost', 'status', 'created_at', 'logs',
+            'total_cost', 'termii_cost', 'status', 'created_at',
         ]
-        read_only_fields = [f for f in fields if f not in ()]
+        read_only_fields = fields
         # provider_error is deliberately excluded — this serializer is what
         # a customer's own GET /api/campaigns/ and /campaigns/<id>/ return,
         # and that field holds raw provider text ("Sendchamp ... Low
         # balance") that names an internal vendor and isn't theirs to see.
         # AdminCampaignSerializer below is the one that includes it.
+
+
+class CampaignDetailSerializer(CampaignSerializer):
+    """Adds the per-recipient log — only worth the payload size on a
+    single campaign's own page (CampaignDetailView), never on a list."""
+
+    logs = SMSLogSerializer(many=True, read_only=True)
+
+    class Meta(CampaignSerializer.Meta):
+        fields = CampaignSerializer.Meta.fields + ['logs']
+        read_only_fields = fields
 
 
 class AdminCampaignSerializer(CampaignSerializer):
