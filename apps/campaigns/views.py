@@ -686,7 +686,12 @@ class AdminCampaignListCreateView(generics.ListAPIView):
         serializer = AdminCampaignCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        recipients_numbers = data.get('manual_numbers') or []
+
+        if data.get('group_id'):
+            group = get_object_or_404(ContactGroup, id=data['group_id'], user=request.user)
+            recipients_numbers = list(group.contacts.values_list('phone_number', flat=True))
+        else:
+            recipients_numbers = data.get('manual_numbers') or []
         recipient_count = len(recipients_numbers) or data.get('recipient_count', 0)
 
         if recipient_count == 0:

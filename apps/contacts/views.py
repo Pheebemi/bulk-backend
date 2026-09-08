@@ -6,6 +6,7 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.campaigns.permissions import IsAdmin
 from config.pagination import StandardResultsPagination
 
 from .models import Contact, ContactGroup
@@ -87,3 +88,28 @@ class ContactCsvUploadView(APIView):
             created += 1
 
         return Response(ContactGroupSerializer(group).data, status=status.HTTP_201_CREATED)
+
+
+# --- Admin --------------------------------------------------------------------
+# The admin console gets its own contact groups, entirely separate from any
+# customer's — same behavior as above (every view keys off self.request.user,
+# which is the admin's own account here), just IsAdmin instead of
+# IsAuthenticated. This is what lets an admin campaign send target a group
+# instead of only "every user" or a pasted list (see
+# AdminCampaignListCreateView.post() in apps.campaigns.views).
+
+
+class AdminContactGroupListCreateView(ContactGroupListCreateView):
+    permission_classes = [IsAdmin]
+
+
+class AdminContactGroupDetailView(ContactGroupDetailView):
+    permission_classes = [IsAdmin]
+
+
+class AdminContactListCreateView(ContactListCreateView):
+    permission_classes = [IsAdmin]
+
+
+class AdminContactCsvUploadView(ContactCsvUploadView):
+    permission_classes = [IsAdmin]

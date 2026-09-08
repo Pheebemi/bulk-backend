@@ -173,12 +173,16 @@ class AdminCampaignCreateSerializer(serializers.Serializer):
     sender_id = serializers.CharField(max_length=11)
     message = serializers.CharField()
     channel = serializers.ChoiceField(choices=['generic', 'dnd'])
+    # One of these three — group_id resolves to the admin's own contact
+    # group (see apps.contacts.views.AdminContactGroupListCreateView),
+    # same as a customer's own campaign screen offers.
+    group_id = serializers.IntegerField(required=False)
     manual_numbers = serializers.ListField(child=serializers.CharField(), required=False)
     recipient_count = serializers.IntegerField(required=False, min_value=0)
 
     def validate(self, attrs):
-        if not attrs.get('manual_numbers') and not attrs.get('recipient_count'):
-            raise serializers.ValidationError('Provide either manual_numbers or recipient_count.')
+        if not attrs.get('group_id') and not attrs.get('manual_numbers') and not attrs.get('recipient_count'):
+            raise serializers.ValidationError('Provide a group_id, manual_numbers, or recipient_count.')
         return attrs
 
 
