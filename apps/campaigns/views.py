@@ -13,7 +13,7 @@ from rest_framework.views import APIView
 from apps.accounts.models import Wallet
 from apps.accounts.utils import log_wallet_transaction
 from apps.contacts.models import ContactGroup
-from config.pagination import StandardResultsPagination
+from config.pagination import CampaignHistoryPagination, StandardResultsPagination
 from integrations.termii import TermiiError, termii
 from integrations.sendchamp import SendchampError, sendchamp
 from integrations.kudisms import KudiSMSError, kudisms
@@ -143,7 +143,7 @@ def _sync_sender_id_statuses(queryset):
 class CampaignListCreateView(generics.ListAPIView):
     serializer_class = CampaignSerializer
     permission_classes = [permissions.IsAuthenticated]
-    pagination_class = StandardResultsPagination
+    pagination_class = CampaignHistoryPagination
 
     def get_queryset(self):
         return Campaign.objects.filter(user=self.request.user, is_admin_campaign=False).order_by('-created_at')
@@ -677,7 +677,7 @@ class AdminAllCampaignsListView(generics.ListAPIView):
 class AdminCampaignListCreateView(generics.ListAPIView):
     serializer_class = CampaignSerializer
     permission_classes = [IsAdmin]
-    pagination_class = StandardResultsPagination
+    pagination_class = CampaignHistoryPagination
 
     def get_queryset(self):
         return Campaign.objects.filter(is_admin_campaign=True).order_by('-created_at')
