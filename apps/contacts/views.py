@@ -58,6 +58,19 @@ class ContactListCreateView(generics.ListCreateAPIView):
         # recipient list of a bulk message — never stored in a phonebook.
 
 
+class ContactDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Edit or remove a single already-saved contact — the CRUD that was
+    missing once a contact existed (only add-one and CSV import created
+    them before). Scoped to both the group in the URL and the requesting
+    user, same as ContactListCreateView.get_group()."""
+
+    serializer_class = ContactSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Contact.objects.filter(group_id=self.kwargs['group_id'], group__user=self.request.user)
+
+
 class ContactCsvUploadView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser]
@@ -108,6 +121,10 @@ class AdminContactGroupDetailView(ContactGroupDetailView):
 
 
 class AdminContactListCreateView(ContactListCreateView):
+    permission_classes = [IsAdmin]
+
+
+class AdminContactDetailView(ContactDetailView):
     permission_classes = [IsAdmin]
 
 
