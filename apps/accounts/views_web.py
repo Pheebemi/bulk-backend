@@ -3,6 +3,7 @@ replacement for the old Next.js SPA's login/signup pages. Kept separate
 from views.py (the DRF API, still used by nothing right now but left in
 place rather than deleted speculatively)."""
 
+from django.contrib import messages
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.decorators import login_required
@@ -20,6 +21,7 @@ def login_view(request):
     form = EmailLoginForm(request.POST or None, request=request)
     if request.method == 'POST' and form.is_valid():
         auth_login(request, form.cleaned_data['user'])
+        messages.success(request, 'Welcome back.')
         return redirect('web-dashboard')
     return render(request, 'accounts/login.html', {'form': form})
 
@@ -31,6 +33,7 @@ def signup_view(request):
     if request.method == 'POST' and form.is_valid():
         user = form.save()
         auth_login(request, user)
+        messages.success(request, f'Welcome to Reachly, {user.full_name or "there"}.')
         return redirect('web-dashboard')
     return render(request, 'accounts/signup.html', {'form': form})
 
@@ -38,6 +41,7 @@ def signup_view(request):
 @login_required(login_url='web-login')
 def logout_view(request):
     auth_logout(request)
+    messages.info(request, 'You have been logged out.')
     return redirect('web-login')
 
 

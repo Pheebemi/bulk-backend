@@ -13,7 +13,6 @@
       <button type="button" data-preset="50000" class="rounded-lg border border-border px-3.5 py-2 text-sm font-semibold">₦50,000</button>
     </div>
     <button type="button" id="pay" class="btn-primary w-full py-3.5">Pay with Flutterwave</button>
-    <div id="pay-msg" class="mt-4 hidden rounded-lg px-3.5 py-3 text-sm font-semibold"></div>
   </div>
   <div class="card h-fit p-5 sm:p-7">
     <div class="mb-2 text-xs font-bold text-muted">CURRENT BALANCE</div>
@@ -37,11 +36,8 @@
 <script>
 (function () {
   var cfg = JSON.parse(document.getElementById('fw-config').textContent);
-  var amount = document.getElementById('amount'), msg = document.getElementById('pay-msg');
-  function show(text, ok) {
-    msg.textContent = text; msg.classList.remove('hidden', 'bg-accent-soft', 'text-accent', 'bg-danger/10', 'text-danger');
-    msg.classList.add.apply(msg.classList, ok ? ['bg-accent-soft', 'text-accent'] : ['bg-danger/10', 'text-danger']);
-  }
+  var amount = document.getElementById('amount');
+  function show(text, ok) { ok ? toast.success(text) : toast.error(text); }
   document.querySelectorAll('[data-preset]').forEach(function (b) {
     b.addEventListener('click', function () { amount.value = b.dataset.preset; });
   });

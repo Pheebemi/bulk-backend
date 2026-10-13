@@ -1,15 +1,53 @@
+{# Sonner-style toaster: stacked bottom-right, auto-dismiss, pause on hover, closable. #}
+<div id="toaster" aria-live="polite" class="pointer-events-none fixed inset-x-0 bottom-4 z-[100] flex flex-col items-center gap-2 px-4 sm:inset-x-auto sm:right-5 sm:items-end sm:px-0"></div>
 {% if messages %}
-<div class="pointer-events-none fixed inset-x-0 top-4 z-[100] flex flex-col items-center gap-2 px-4 sm:items-end sm:pr-6">
-  {% for message in messages %}
-  <div
-    role="status"
-    class="pointer-events-auto flex w-full max-w-sm items-start gap-2.5 rounded-xl border px-4 py-3 text-sm font-semibold shadow-lg
-      {% if message.tags == 'error' %}border-danger/30 bg-surface text-ink
-      {% elif message.tags == 'success' %}border-success/30 bg-surface text-ink
-      {% else %}border-border bg-surface text-ink{% endif %}"
-  >
-    <span class="flex-1">{{ message }}</span>
-  </div>
-  {% endfor %}
-</div>
+<script id="django-messages" type="application/json">[{% for m in messages %}{"type": "{{ m.tags|default:'info'|escapejs }}", "text": "{{ m|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]</script>
 {% endif %}
+<script>
+(function () {
+  var ICONS = {
+    success: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" fill="currentColor" stroke="none"/><path d="M8 12.5l2.7 2.7L16 9.8" stroke="#fff"/></svg>',
+    error: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" fill="currentColor" stroke="none"/><path d="M12 7.5v5.5M12 16.5h.01" stroke="#fff"/></svg>',
+    info: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" fill="currentColor" stroke="none"/><path d="M12 11v5.5M12 7.5h.01" stroke="#fff"/></svg>'
+  };
+  var TONE = { success: 'text-success', error: 'text-danger', info: 'text-accent' };
+  var MAX = 4, DURATION = 4500;
+
+  function dismiss(el) {
+    if (el._gone) return; el._gone = true;
+    clearTimeout(el._timer);
+    el.classList.add('toast-out');
+    setTimeout(function () { el.remove(); }, 220);
+  }
+  function arm(el, ms) { el._timer = setTimeout(function () { dismiss(el); }, ms); }
+
+  function show(type, text) {
+    var host = document.getElementById('toaster');
+    if (!host) return;
+    type = ICONS[type] ? type : (type === 'warning' ? 'error' : 'info');
+    while (host.children.length >= MAX) dismiss(host.children[0]);
+    var el = document.createElement('div');
+    el.setAttribute('role', 'status');
+    el.className = 'toast-in pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl border border-border bg-surface px-4 py-3.5 text-sm font-semibold text-ink shadow-lg sm:w-[356px]';
+    var icon = document.createElement('span'); icon.className = 'mt-px shrink-0 ' + TONE[type]; icon.innerHTML = ICONS[type];
+    var msg = document.createElement('span'); msg.className = 'flex-1 leading-snug'; msg.textContent = text;
+    var close = document.createElement('button'); close.type = 'button'; close.setAttribute('aria-label', 'Dismiss');
+    close.className = 'shrink-0 text-muted hover:text-ink';
+    close.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+    close.addEventListener('click', function () { dismiss(el); });
+    el.append(icon, msg, close);
+    el.addEventListener('mouseenter', function () { clearTimeout(el._timer); });
+    el.addEventListener('mouseleave', function () { arm(el, 1500); });
+    host.appendChild(el);
+    arm(el, DURATION);
+  }
+
+  window.toast = {
+    success: function (t) { show('success', t); },
+    error: function (t) { show('error', t); },
+    info: function (t) { show('info', t); }
+  };
+  var data = document.getElementById('django-messages');
+  if (data) JSON.parse(data.textContent).forEach(function (m) { show(m.type, m.text); });
+})();
+</script>

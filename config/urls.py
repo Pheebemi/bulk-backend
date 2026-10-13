@@ -17,7 +17,14 @@ def health(request):
 
 
 def home(request):
-    return redirect('web-dashboard' if request.user.is_authenticated else 'web-login')
+    from django.shortcuts import render
+
+    from apps.accounts import landing_content as c
+
+    return render(request, 'landing.html', {
+        'use_cases': c.USE_CASES, 'industries': c.INDUSTRIES, 'features': c.FEATURES,
+        'faqs': c.FAQS, 'checklist': c.CHECKLIST,
+    })
 
 
 urlpatterns = [

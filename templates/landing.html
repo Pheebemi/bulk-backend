@@ -1,0 +1,170 @@
+{% extends "layout/base.html" %}
+{% load static %}
+{% block title %}Reachly — Bulk SMS for Nigerian businesses{% endblock %}
+{% block extra_head %}<meta name="description" content="Send bulk SMS to every Nigerian network, including DND numbers. Pay per message, manage contacts, and track delivery in one dashboard.">{% endblock %}
+{% block content %}
+{% url 'web-signup' as signup_url %}
+<header class="sticky top-0 z-40 border-b border-border bg-bg/85 backdrop-blur">
+  <div class="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
+    <a href="/" class="flex items-center gap-2.5">
+      <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-accent"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H7l-3 3V4z"/></svg></div>
+      <span class="text-xl font-extrabold text-ink">Reachly</span>
+    </a>
+    <nav class="hidden items-center gap-7 text-sm font-semibold text-muted md:flex">
+      <a href="#use-cases" class="hover:text-ink">Use cases</a><a href="#features" class="hover:text-ink">Features</a><a href="#pricing" class="hover:text-ink">Pricing</a><a href="#faq" class="hover:text-ink">FAQ</a>
+    </nav>
+    <div class="flex items-center gap-2.5">
+      {% if request.user.is_authenticated %}
+      <a href="{% url 'web-dashboard' %}" class="btn-primary">Dashboard</a>
+      {% else %}
+      <a href="{% url 'web-login' %}" class="hidden rounded-lg px-4 py-2.5 text-sm font-bold text-ink sm:block">Log in</a>
+      <a href="{{ signup_url }}" class="btn-primary">Get started</a>
+      {% endif %}
+    </div>
+  </div>
+</header>
+
+<section class="border-b border-border">
+  <div class="mx-auto max-w-6xl px-5 py-16 sm:py-24">
+    <div class="grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr]">
+      <div>
+        <div class="mb-5 inline-flex items-center gap-2 rounded-full bg-accent-soft px-3.5 py-1.5 text-xs font-bold text-accent"><span class="h-1.5 w-1.5 rounded-full bg-accent"></span>Delivers to DND numbers</div>
+        <h1 class="text-4xl font-extrabold leading-[1.1] text-ink sm:text-5xl lg:text-6xl">Bulk SMS that actually reaches Nigerian phones</h1>
+        <p class="mt-5 max-w-xl text-lg leading-relaxed text-muted">Send to every network, including numbers on the Do-Not-Disturb register. Pay only for the messages you send, manage your contacts, and see exactly what was delivered.</p>
+        <div class="mt-8 flex flex-wrap gap-3">
+          <a href="{{ signup_url }}" class="btn-primary px-6 py-3.5">Create a free account</a>
+          <a href="#pricing" class="btn-secondary px-6 py-3.5">See pricing</a>
+        </div>
+        <p class="mt-4 text-xs text-muted">No monthly fee. No minimum spend.</p>
+        <div class="mt-12 grid grid-cols-3 gap-6 border-t border-border pt-8">
+          <div><div class="text-3xl font-extrabold text-ink sm:text-4xl">4</div><div class="mt-1 text-sm text-muted">Networks covered</div></div>
+          <div><div class="text-3xl font-extrabold text-ink sm:text-4xl">DND</div><div class="mt-1 text-sm text-muted">Route included</div></div>
+          <div><div class="text-3xl font-extrabold text-ink sm:text-4xl">160</div><div class="mt-1 text-sm text-muted">Characters per segment</div></div>
+        </div>
+      </div>
+      <div class="rounded-2xl border border-border bg-surface p-6 sm:p-8">
+        <img src="{% static 'illustrations/sending-message.svg' %}" alt="" class="mx-auto mb-4 w-full max-w-[280px]" onerror="this.remove()">
+        <div class="mb-4 text-xs font-bold uppercase tracking-widest text-muted">New campaign</div>
+        <div class="flex flex-col gap-3 text-sm">
+          <div class="flex justify-between border-b border-border pb-3"><span class="text-muted">Sender ID</span><span class="font-bold text-ink">PHEEDEV</span></div>
+          <div class="flex justify-between border-b border-border pb-3"><span class="text-muted">Group</span><span class="font-bold text-ink">VIP Customers · 1,240</span></div>
+          <div class="flex justify-between border-b border-border pb-3"><span class="text-muted">Route</span><span class="font-bold text-ink">DND</span></div>
+          <div class="flex justify-between border-b border-border pb-3"><span class="text-muted">Segments</span><span class="font-bold text-ink">1 × 1,240</span></div>
+          <div class="flex justify-between pt-1"><span class="font-bold text-ink">Cost</span><span class="font-bold text-accent">Shown before you confirm</span></div>
+        </div>
+        <div class="mt-6 rounded-lg bg-accent px-4 py-3 text-center text-sm font-bold text-white">Send campaign</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="use-cases" class="border-b border-border py-20"><div class="mx-auto max-w-6xl px-5">
+  <div class="mx-auto mb-10 max-w-3xl text-center"><div class="mb-3 text-xs font-bold uppercase tracking-widest text-accent">Use cases</div><h2 class="text-3xl font-extrabold leading-tight text-ink sm:text-4xl">One platform for every message you send</h2><p class="mt-4 text-base leading-relaxed text-muted">From one-time passwords to a campaign for your whole customer list.</p></div>
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    {% for title, body in use_cases %}<div class="flex h-full flex-col rounded-2xl border border-border bg-surface p-6 transition hover:border-accent/50 hover:shadow-lg"><h3 class="text-lg font-bold text-ink">{{ title }}</h3><p class="mt-2 text-sm leading-relaxed text-muted">{{ body }}</p></div>{% endfor %}
+  </div>
+</div></section>
+
+<section class="border-b border-border bg-surface2/40 py-20"><div class="mx-auto max-w-6xl px-5">
+  <div class="mx-auto mb-10 max-w-3xl text-center"><div class="mb-3 text-xs font-bold uppercase tracking-widest text-accent">Industries</div><h2 class="text-3xl font-extrabold leading-tight text-ink sm:text-4xl">Built for how Nigerian businesses message</h2><p class="mt-4 text-base leading-relaxed text-muted">The route, the sender ID and the pricing that each sector actually needs.</p></div>
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    {% for title, body in industries %}<div class="flex h-full flex-col rounded-2xl border border-border bg-surface p-6 transition hover:border-accent/50 hover:shadow-lg"><h3 class="text-lg font-bold text-ink">{{ title }}</h3><p class="mt-2 text-sm leading-relaxed text-muted">{{ body }}</p></div>{% endfor %}
+  </div>
+</div></section>
+
+<section id="pricing" class="border-b border-border py-20"><div class="mx-auto max-w-6xl px-5">
+  <div class="mx-auto mb-10 max-w-3xl text-center"><div class="mb-3 text-xs font-bold uppercase tracking-widest text-accent">Pricing</div><h2 class="text-3xl font-extrabold leading-tight text-ink sm:text-4xl">Pay for the messages you send</h2><p class="mt-4 text-base leading-relaxed text-muted">Fund a wallet, spend it down per message. Nothing monthly, and unsent messages come back to your balance.</p></div>
+  <div class="mx-auto grid max-w-3xl gap-5 md:grid-cols-2">
+    <div class="rounded-2xl border border-border bg-surface p-8"><div class="text-sm font-bold text-muted">Standard route</div><h3 class="mt-3 text-2xl font-extrabold text-ink">Everyday campaigns</h3><p class="mt-4 text-sm leading-relaxed text-muted">For customers not on the Do-Not-Disturb register. Best for general campaigns and notifications, at the lower of our two per-segment rates.</p></div>
+    <div class="rounded-2xl border-2 border-accent bg-surface p-8"><div class="flex items-center justify-between"><div class="text-sm font-bold text-accent">DND route</div><span class="rounded-full bg-accent-soft px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-accent">Reaches everyone</span></div><h3 class="mt-3 text-2xl font-extrabold text-ink">Messages that must arrive</h3><p class="mt-4 text-sm leading-relaxed text-muted">Delivers to numbers on the DND register, where standard traffic is blocked. Required for OTPs and time-critical alerts.</p></div>
+  </div>
+  <p class="mx-auto mt-6 max-w-3xl text-center text-xs text-muted">A segment is 160 characters, or 70 if the message contains special characters. Longer messages are charged per segment. Current rates for both routes are shown in your dashboard, and the exact cost of a campaign is calculated before you confirm.</p>
+</div></section>
+
+<section id="features" class="border-b border-border bg-surface2/40 py-20"><div class="mx-auto max-w-6xl px-5">
+  <div class="mx-auto mb-10 max-w-3xl text-center"><div class="mb-3 text-xs font-bold uppercase tracking-widest text-accent">Platform</div><h2 class="text-3xl font-extrabold leading-tight text-ink sm:text-4xl">Everything you need to run a campaign</h2></div>
+  <div id="feature-tabs" class="mb-8 flex flex-wrap justify-center gap-2"></div>
+  <div class="grid items-center gap-8 rounded-2xl border border-border bg-surface p-6 sm:p-8 md:grid-cols-2 md:p-10">
+    <div>
+      <h3 id="ft-title" class="text-2xl font-extrabold text-ink"></h3>
+      <p id="ft-body" class="mt-3 text-sm leading-relaxed text-muted"></p>
+      <ul id="ft-points" class="mt-5 flex flex-col gap-2.5"></ul>
+    </div>
+    <div class="rounded-xl border border-border bg-bg p-6">
+      <div class="mx-auto w-full max-w-[260px] rounded-[28px] border-8 border-sidebar bg-surface p-3 shadow-xl">
+        <div class="mx-auto mb-3 h-1 w-12 rounded-full bg-border"></div>
+        <div class="mb-2 text-center text-[10px] font-bold uppercase tracking-widest text-muted">REACHLY</div>
+        <div class="flex flex-col gap-2">
+          <div class="rounded-xl rounded-tl-sm bg-surface2 px-3 py-2 text-[11px] leading-snug text-ink">Your order #4821 has shipped. Track it at rchly.co/t/4821</div>
+          <div class="rounded-xl rounded-tl-sm bg-surface2 px-3 py-2 text-[11px] leading-snug text-ink">Your OTP is 402913. It expires in 5 minutes.</div>
+          <div class="self-end rounded-xl rounded-br-sm bg-accent px-3 py-2 text-[11px] font-medium text-white">Delivered ✓</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div></section>
+{{ features|json_script:"features-data" }}
+
+<section class="border-b border-border py-20"><div class="mx-auto max-w-6xl px-5">
+  <div class="mx-auto mb-10 max-w-3xl text-center"><div class="mb-3 text-xs font-bold uppercase tracking-widest text-accent">Buyer's guide</div><h2 class="text-3xl font-extrabold leading-tight text-ink sm:text-4xl">How to choose a bulk SMS provider in Nigeria</h2><p class="mt-4 text-base leading-relaxed text-muted">Worth asking any provider, including us.</p></div>
+  <div class="grid gap-5 md:grid-cols-2">
+    {% for title, body in checklist %}<div class="flex gap-4"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="mt-0.5 shrink-0 text-accent"><path d="M20 6L9 17l-5-5"/></svg><div><h3 class="text-base font-bold text-ink">{{ title }}</h3><p class="mt-1 text-sm leading-relaxed text-muted">{{ body }}</p></div></div>{% endfor %}
+  </div>
+</div></section>
+
+<section id="faq" class="border-b border-border bg-surface2/40 py-20"><div class="mx-auto max-w-6xl px-5">
+  <div class="mx-auto mb-10 max-w-3xl text-center"><div class="mb-3 text-xs font-bold uppercase tracking-widest text-accent">FAQ</div><h2 class="text-3xl font-extrabold leading-tight text-ink sm:text-4xl">Questions people ask before signing up</h2></div>
+  <div class="mx-auto max-w-3xl divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
+    {% for q, a in faqs %}
+    <details class="group" {% if forloop.first %}open{% endif %}>
+      <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 text-left"><span class="text-base font-bold text-ink">{{ q }}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 text-muted transition-transform group-open:rotate-180"><path d="M6 9l6 6 6-6"/></svg></summary>
+      <div class="px-6 pb-5 text-sm leading-relaxed text-muted">{{ a }}</div>
+    </details>
+    {% endfor %}
+  </div>
+</div></section>
+
+<section class="px-5 py-20"><div class="mx-auto max-w-4xl rounded-3xl border border-white/10 bg-sidebar px-6 py-16 text-center shadow-xl shadow-accent/5">
+  <img src="{% static 'illustrations/contacts.svg' %}" alt="" class="mx-auto mb-6 w-52 opacity-95" onerror="this.remove()">
+  <h2 class="text-3xl font-extrabold leading-tight text-white sm:text-4xl">Send your first campaign today</h2>
+  <p class="mt-4 text-base leading-relaxed text-slate-300">Create an account, fund your wallet, and send. No subscription, no minimum spend.</p>
+  <div class="mt-8 flex flex-wrap justify-center gap-3">
+    <a href="{{ signup_url }}" class="btn-primary px-6 py-3.5">Create a free account</a>
+    <a href="{% url 'web-login' %}" class="rounded-lg border border-white/20 px-6 py-3.5 text-sm font-bold text-white">Log in</a>
+  </div>
+</div></section>
+
+<footer class="border-t border-border bg-bg py-10"><div class="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 text-sm text-muted sm:flex-row">
+  <div class="flex items-center gap-2.5"><div class="flex h-8 w-8 items-center justify-center rounded-lg bg-accent"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H7l-3 3V4z"/></svg></div><span class="font-extrabold text-ink">Reachly</span></div>
+  <div class="flex flex-wrap justify-center gap-6"><a href="#use-cases" class="hover:text-ink">Use cases</a><a href="#pricing" class="hover:text-ink">Pricing</a><a href="#faq" class="hover:text-ink">FAQ</a><a href="{% url 'web-login' %}" class="hover:text-ink">Log in</a></div>
+  <div>© {% now "Y" %} Reachly</div>
+</div></footer>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+(function () {
+  var features = JSON.parse(document.getElementById('features-data').textContent);
+  var tabs = document.getElementById('feature-tabs'), active = 0;
+  function render() {
+    var f = features[active];
+    document.getElementById('ft-title').textContent = f.title;
+    document.getElementById('ft-body').textContent = f.body;
+    var ul = document.getElementById('ft-points'); ul.innerHTML = '';
+    f.points.forEach(function (p) {
+      var li = document.createElement('li'); li.className = 'flex items-start gap-2.5 text-sm text-ink';
+      li.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="mt-0.5 shrink-0 text-accent"><path d="M20 6L9 17l-5-5"/></svg>';
+      li.appendChild(document.createTextNode(p)); ul.appendChild(li);
+    });
+    Array.prototype.forEach.call(tabs.children, function (b, i) {
+      b.className = 'rounded-full px-4 py-2 text-sm font-bold transition ' + (i === active ? 'bg-accent text-white' : 'border border-border bg-surface text-muted hover:text-ink');
+      b.setAttribute('aria-pressed', i === active);
+    });
+  }
+  features.forEach(function (f, i) {
+    var b = document.createElement('button'); b.type = 'button'; b.textContent = f.name;
+    b.addEventListener('click', function () { active = i; render(); }); tabs.appendChild(b);
+  });
+  render();
+})();
+</script>
+{% endblock %}
