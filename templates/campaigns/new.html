@@ -1,0 +1,91 @@
+{% extends "layout/user_shell.html" %}
+{% block title %}New campaign — Reachly{% endblock %}
+{% block page_content %}
+<h1 class="mb-6 text-2xl font-extrabold text-ink">New campaign</h1>
+{% if not sender_ids %}
+<div class="mb-4 max-w-2xl rounded-lg bg-warning/10 px-3.5 py-3 text-sm font-semibold text-warning">
+  You have no active Sender ID yet — <a href="{% url 'web-sender-ids' %}" class="underline">request one</a>.
+</div>
+{% endif %}
+<form method="post" id="campaign-form" class="grid max-w-4xl grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr]">
+  {% csrf_token %}
+  <div class="card flex flex-col gap-5 p-5 sm:p-7">
+    <div>
+      <label class="text-xs font-bold text-muted">SENDER ID</label>
+      <select name="sender_id" required>
+        {% for s in sender_ids %}<option value="{{ s.name }}">{{ s.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <div class="mb-2 text-xs font-bold text-muted">CHANNEL</div>
+      <div class="flex flex-wrap gap-2">
+        <label class="cursor-pointer rounded-lg border border-border px-3.5 py-2 text-sm font-semibold has-[:checked]:bg-accent-soft has-[:checked]:text-accent">
+          <input type="radio" name="channel" value="dnd" class="hidden" checked> DND (Transactional)
+        </label>
+        <label class="cursor-pointer rounded-lg border border-border px-3.5 py-2 text-sm font-semibold has-[:checked]:bg-accent-soft has-[:checked]:text-accent">
+          <input type="radio" name="channel" value="generic" class="hidden"> Generic (Promotional)
+        </label>
+      </div>
+    </div>
+    <div>
+      <div class="mb-1 flex justify-between">
+        <label class="text-xs font-bold text-muted">MESSAGE</label>
+        <span id="msg-meta" class="text-xs text-muted">0 chars · 1 segment(s)</span>
+      </div>
+      <textarea name="message" id="message" required class="min-h-[120px]" placeholder="Type your message...">{{ posted.message }}</textarea>
+    </div>
+    <div>
+      <div class="mb-2 text-xs font-bold text-muted">RECIPIENTS</div>
+      <div class="mb-3 flex flex-wrap gap-2">
+        <label class="cursor-pointer rounded-lg border border-border px-3.5 py-2 text-sm font-semibold has-[:checked]:bg-accent-soft has-[:checked]:text-accent">
+          <input type="radio" name="source" value="group" class="hidden" checked> Contact group
+        </label>
+        <label class="cursor-pointer rounded-lg border border-border px-3.5 py-2 text-sm font-semibold has-[:checked]:bg-accent-soft has-[:checked]:text-accent">
+          <input type="radio" name="source" value="manual" class="hidden"> Paste numbers
+        </label>
+      </div>
+      <div id="group-box">
+        <select name="group_id">
+          {% for g in groups %}<option value="{{ g.id }}">{{ g.name }} ({{ g.count }})</option>{% empty %}<option value="">No groups yet</option>{% endfor %}
+        </select>
+      </div>
+      <div id="manual-box" class="hidden">
+        <textarea name="manual_numbers" id="manual" class="min-h-[80px]" placeholder="2348012345678, 2348023456789, ..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="card h-fit p-5 sm:p-7">
+    <div class="mb-4"><div class="mb-1.5 text-xs font-bold text-muted">RECIPIENTS</div><div id="est-recipients" class="text-xl font-extrabold text-ink">0</div></div>
+    <div class="mb-4"><div class="mb-1.5 text-xs font-bold text-muted">ESTIMATED COST</div><div id="est-cost" class="text-2xl font-extrabold text-accent">₦0.00</div></div>
+    <div class="mb-4 text-xs text-muted">Wallet balance: <b>₦{{ request.user.wallet.balance|floatformat:2 }}</b></div>
+    <button type="submit" class="btn-primary w-full py-3.5">Send campaign</button>
+  </div>
+</form>
+{{ config_json|json_script:"cfg" }}
+<script>
+(function () {
+  var cfg = JSON.parse(document.getElementById('cfg').textContent);
+  var form = document.getElementById("campaign-form");
+  var special = /[;\/^{}\\\[~\]|€'"]/;
+  function segments(m) {
+    if (!m) return 1;
+    return Math.max(1, Math.ceil(m.length / (special.test(m) ? 70 : 160)));
+  }
+  function update() {
+    var msg = document.getElementById('message').value;
+    var source = form.source.value, channel = form.channel.value;
+    var count = source === 'group'
+      ? (cfg.groups[form.group_id.value] || 0)
+      : document.getElementById('manual').value.split(/[\n,]+/).map(function (s) { return s.trim(); }).filter(Boolean).length;
+    var seg = segments(msg);
+    document.getElementById('msg-meta').textContent = msg.length + ' chars · ' + seg + ' segment(s)';
+    document.getElementById('est-recipients').textContent = count.toLocaleString();
+    document.getElementById('est-cost').textContent = '₦' + (count * seg * cfg[channel]).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('group-box').classList.toggle('hidden', source !== 'group');
+    document.getElementById('manual-box').classList.toggle('hidden', source !== 'manual');
+  }
+  form.addEventListener('input', update); form.addEventListener('change', update); update();
+})();
+</script>
+{% endblock %}

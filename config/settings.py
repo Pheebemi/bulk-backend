@@ -43,7 +43,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -51,6 +51,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'apps.accounts.context_processors.nav',
             ],
         },
     },
@@ -82,6 +83,11 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
+# Compiled Tailwind CSS + hand-drawn illustrations live here, committed
+# (same as the admin's own static output) since Vercel's Python builder
+# has no build step to run collectstatic for us.
+_static_dir = BASE_DIR / 'static'
+STATICFILES_DIRS = [_static_dir] if _static_dir.exists() else []
 # collectstatic writes here; the directory is committed so the Vercel
 # function has the admin's CSS/JS available at runtime (Vercel's Python
 # builder has no build step to run collectstatic for us).
@@ -140,3 +146,12 @@ KUDISMS_BASE_URL = config('KUDISMS_BASE_URL', default='https://my.kudisms.net')
 # long random value in production; a blank default means the endpoint
 # rejects every call rather than silently allowing an unauthenticated one.
 CRON_SECRET = config('CRON_SECRET', default='')
+
+# The server-rendered pages post forms same-origin behind Vercel's proxy.
+# Without this Django sees plain http, and its CSRF Origin check (the
+# browser sends an https Origin) would reject every login/form POST.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='https://*.vercel.app', cast=Csv())
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+LOGIN_URL = 'web-login'

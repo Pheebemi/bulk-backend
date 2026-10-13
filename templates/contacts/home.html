@@ -1,0 +1,36 @@
+{% extends names.base %}
+{% load static %}
+{% block title %}Contacts — Reachly{% endblock %}
+{% block page_content %}
+<h1 class="mb-1 text-2xl font-extrabold text-ink">Contact groups</h1>
+{% if scope == 'console' %}<p class="mb-4 max-w-2xl text-sm text-muted">The admin console's own groups — separate from any customer's. Use them to send a platform campaign to a specific list.</p>{% endif %}
+<div class="mb-6 mt-4 grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2">
+  <form method="post" class="card p-4">
+    {% csrf_token %}
+    <div class="text-xs font-bold text-muted">CREATE A GROUP</div>
+    <input type="text" name="group_name" placeholder="Group name" required>
+    <button type="submit" class="btn-primary mt-3 w-full">Create group</button>
+  </form>
+  <form method="post" enctype="multipart/form-data" class="card p-4">
+    {% csrf_token %}
+    <div class="text-xs font-bold text-muted">UPLOAD A CSV</div>
+    <input type="file" name="file" accept=".csv" required>
+    <input type="text" name="group_name" placeholder="Group name (optional)" class="!mt-2">
+    <button type="submit" class="btn-primary mt-3 w-full">Upload CSV</button>
+  </form>
+</div>
+<p class="mb-4 text-xs text-muted">CSV columns: phone_number, first_name (optional), last_name (optional).</p>
+<div class="flex flex-col gap-3">
+  {% for g in groups %}
+  <a href="{% url names.group g.pk %}" class="card flex items-center justify-between px-5 py-4 hover:border-accent">
+    <div><div class="text-sm font-bold text-ink">{{ g.name }}</div><div class="text-xs text-muted">{{ g.n }} contact{{ g.n|pluralize }}</div></div>
+    <span class="text-sm font-semibold text-muted">Open &rarr;</span>
+  </a>
+  {% empty %}
+  <div class="flex flex-col items-center py-8 text-center">
+    <img src="{% static 'illustrations/contacts.svg' %}" alt="" class="mb-3 w-64" onerror="this.remove()">
+    <p class="text-sm text-muted">No contact groups yet — create one or upload a CSV.</p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

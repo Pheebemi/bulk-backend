@@ -71,6 +71,28 @@ class ContactDetailView(generics.RetrieveUpdateDestroyAPIView):
         return Contact.objects.filter(group_id=self.kwargs['group_id'], group__user=self.request.user)
 
 
+def import_contacts_csv(user, file, group_name):
+    """Creates a group from an uploaded CSV — shared by the API view and
+    the server-rendered Contacts page."""
+    group = ContactGroup.objects.create(user=user, name=group_name or file.name)
+    raw_bytes = file.read()
+    decoded = io.StringIO(raw_bytes.decode('utf-8', errors='ignore'))
+    reader = csv.DictReader(decoded)
+    # Accept either explicit columns (phone_number, first_name, last_name)
+    # or a single unlabelled phone-number column.
+    for row in reader:
+        phone = row.get('phone_number') or row.get('phone') or next(iter(row.values()), None)
+        if not phone:
+            continue
+        Contact.objects.create(
+            group=group,
+            phone_number=phone.strip(),
+            first_name=(row.get('first_name') or '').strip(),
+            last_name=(row.get('last_name') or '').strip(),
+        )
+    return group
+
+
 class ContactCsvUploadView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser]
@@ -81,24 +103,7 @@ class ContactCsvUploadView(APIView):
         if not file:
             return Response({'detail': 'file is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        group = ContactGroup.objects.create(user=request.user, name=group_name or file.name)
-        raw_bytes = file.read()
-        decoded = io.StringIO(raw_bytes.decode('utf-8', errors='ignore'))
-        reader = csv.DictReader(decoded)
-        # Accept either explicit columns (phone_number, first_name, last_name)
-        # or a single unlabelled phone-number column.
-        created = 0
-        for row in reader:
-            phone = row.get('phone_number') or row.get('phone') or next(iter(row.values()), None)
-            if not phone:
-                continue
-            Contact.objects.create(
-                group=group,
-                phone_number=phone.strip(),
-                first_name=(row.get('first_name') or '').strip(),
-                last_name=(row.get('last_name') or '').strip(),
-            )
-            created += 1
+        group = import_contacts_csv(request.user, file, group_name)
 
         return Response(ContactGroupSerializer(group).data, status=status.HTTP_201_CREATED)
 

@@ -1,0 +1,29 @@
+{% extends "layout/user_shell.html" %}
+{% block title %}Campaign — Reachly{% endblock %}
+{% block page_content %}
+<a href="{% url 'web-campaigns' %}" class="mb-4 inline-block text-sm font-bold text-accent">&larr; All campaigns</a>
+<div class="mb-6 flex flex-wrap items-center gap-3">
+  <h1 class="text-2xl font-extrabold text-ink">Campaign #{{ campaign.pk }}</h1>
+  {% include "includes/status_badge.html" with status=campaign.status %}
+</div>
+<div class="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+  <div class="card p-4"><div class="text-xs font-bold text-muted">RECIPIENTS</div><div class="text-xl font-extrabold">{{ campaign.total_recipients }}</div></div>
+  <div class="card p-4"><div class="text-xs font-bold text-muted">DELIVERED</div><div class="text-xl font-extrabold text-success">{{ campaign.delivered }}</div></div>
+  <div class="card p-4"><div class="text-xs font-bold text-muted">FAILED</div><div class="text-xl font-extrabold text-danger">{{ campaign.failed }}</div></div>
+  <div class="card p-4"><div class="text-xs font-bold text-muted">COST</div><div class="text-xl font-extrabold">₦{{ campaign.total_cost|floatformat:2 }}</div></div>
+</div>
+<div class="card mb-6 p-5">
+  <div class="mb-1 text-xs font-bold text-muted">SENDER ID · {{ campaign.channel|upper }}</div>
+  <div class="mb-3 font-semibold">{{ campaign.sender_id }}</div>
+  <div class="mb-1 text-xs font-bold text-muted">MESSAGE</div>
+  <p class="whitespace-pre-wrap text-sm">{{ campaign.message }}</p>
+</div>
+{% if logs %}
+<h3 class="mb-3 text-base font-bold text-ink">Delivery log</h3>
+<div class="card overflow-x-auto"><div class="min-w-[420px]">
+  {% for l in logs %}
+  <div class="grid grid-cols-2 border-b border-border px-4 py-2.5 text-sm last:border-b-0"><span>{{ l.recipient }}</span><span class="capitalize text-muted">{{ l.status|lower }}</span></div>
+  {% endfor %}
+</div></div>
+{% endif %}
+{% endblock %}

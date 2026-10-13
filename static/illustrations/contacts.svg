@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" fill="none">
+  <ellipse cx="240" cy="326" rx="170" ry="20" fill="#0b2038" opacity="0.06"/>
+
+  <!-- Back contact cards, fanned -->
+  <g transform="rotate(-10 150 180)">
+    <rect x="90" y="120" width="120" height="150" rx="14" fill="#e7f0ff"/>
+  </g>
+  <g transform="rotate(8 330 180)">
+    <rect x="270" y="120" width="120" height="150" rx="14" fill="#eef2f7"/>
+  </g>
+
+  <!-- Front contact card -->
+  <rect x="170" y="96" width="140" height="180" rx="16" fill="#ffffff" stroke="#e1e7ef" stroke-width="2"/>
+  <circle cx="240" cy="150" r="28" fill="#1f6feb"/>
+  <path d="M222 150a18 18 0 0 1 36 0" fill="none"/>
+  <rect x="205" y="194" width="70" height="10" rx="5" fill="#0b2038" opacity="0.8"/>
+  <rect x="213" y="212" width="54" height="8" rx="4" fill="#5b6b82" opacity="0.5"/>
+  <rect x="195" y="236" width="90" height="10" rx="5" fill="#e7f0ff"/>
+
+  <!-- Small satellite avatars representing the group -->
+  <circle cx="110" cy="230" r="22" fill="#ffd34d"/>
+  <circle cx="110" cy="222" r="8" fill="#0b2038" opacity="0.85"/>
+  <path d="M96 244a14 12 0 0 1 28 0" fill="#0b2038" opacity="0.85"/>
+
+  <circle cx="378" cy="236" r="26" fill="#1f6feb" opacity="0.15"/>
+  <circle cx="378" cy="228" r="9" fill="#1f6feb"/>
+  <path d="M362 252a16 14 0 0 1 32 0" fill="#1f6feb"/>
+
+  <!-- Connecting lines (reach / bulk) -->
+  <path d="M190 220 L128 222" stroke="#1f6feb" stroke-width="2" stroke-dasharray="4 5" opacity="0.5"/>
+  <path d="M292 220 L356 224" stroke="#1f6feb" stroke-width="2" stroke-dasharray="4 5" opacity="0.5"/>
+
+  <!-- Accent dots -->
+  <circle cx="70" cy="120" r="8" fill="#1f6feb" opacity="0.4"/>
+  <circle cx="410" cy="120" r="10" fill="#ffd34d" opacity="0.8"/>
+</svg>

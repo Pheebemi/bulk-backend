@@ -1,0 +1,26 @@
+{% extends "layout/admin_shell.html" %}
+{% block title %}Campaigns — Reachly Admin{% endblock %}
+{% block page_content %}
+<h1 class="mb-2 text-2xl font-extrabold text-ink">Campaigns</h1>
+<p class="mb-6 max-w-2xl text-sm text-muted">Every campaign on the platform. A failed or partial one with a reason below usually means the sending provider itself is out of balance.</p>
+<div class="mb-4 flex gap-2">
+  <a href="?" class="rounded-lg border border-border px-3.5 py-2 text-sm font-semibold {% if not failed_only %}bg-accent-soft text-accent{% endif %}">All</a>
+  <a href="?filter=failed" class="rounded-lg border border-border px-3.5 py-2 text-sm font-semibold {% if failed_only %}bg-accent-soft text-accent{% endif %}">Failed / partial</a>
+</div>
+<p class="mb-3 text-xs text-muted">{{ page.paginator.count }} campaign{{ page.paginator.count|pluralize }}</p>
+<div class="card overflow-x-auto"><div class="min-w-[820px]">
+  <div class="grid grid-cols-7 border-b border-border px-4 py-3 text-xs font-bold text-muted"><span>USER</span><span>SENDER ID</span><span>PROVIDER</span><span>RECIPIENTS</span><span>COST</span><span>STATUS</span><span>DATE</span></div>
+  {% for c in page %}
+  <details class="border-b border-border last:border-b-0">
+    <summary class="grid cursor-pointer list-none grid-cols-7 items-center px-4 py-3.5 text-sm">
+      <span class="truncate text-muted">{% if c.is_admin_campaign %}Platform{% else %}{{ c.user.email }}{% endif %}</span>
+      <span class="font-semibold">{{ c.sender_id }}</span><span class="capitalize text-muted">{{ c.provider }}</span>
+      <span class="text-muted">{{ c.total_recipients }}</span><span class="text-muted">₦{{ c.total_cost|floatformat:2 }}</span>
+      {% include "includes/status_badge.html" with status=c.status %}<span class="text-muted">{{ c.created_at|date:"M j, Y" }}</span>
+    </summary>
+    {% if c.provider_error %}<div class="border-t border-border bg-danger/5 px-4 py-3"><div class="mb-1 text-xs font-bold text-muted">PROVIDER ERROR</div><div class="font-mono text-xs text-danger">{{ c.provider_error }}</div></div>{% endif %}
+  </details>
+  {% empty %}<div class="px-4 py-5 text-sm text-muted">{% if failed_only %}No failed or partial campaigns.{% else %}No campaigns sent yet.{% endif %}</div>{% endfor %}
+</div></div>
+{% include "includes/pagination.html" %}
+{% endblock %}

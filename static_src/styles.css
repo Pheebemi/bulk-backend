@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+/**
+ * Scans Django templates for Tailwind classes to generate the final CSS file.
+ */
+@source "../templates/**/*.html";
+@source "../apps/**/templates/**/*.html";
+@source "../**/*.py";
+
+/* Manual .dark toggle (not prefers-color-scheme) — matches the old
+ * Next.js app's lib/theme.tsx behavior: a button flips `.dark` on <html>,
+ * persisted in localStorage. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * ---------------------------------------------------------------------------
+ * Brand theme tokens — carried over verbatim from the old Next.js app's
+ * app/globals.css (same rgb triples, now as hex) so the Django rewrite
+ * looks identical, not re-themed. Admin screens additionally use
+ * Tailwind's stock `purple-*` utilities directly (unchanged from before)
+ * to keep the user/admin visual distinction without a second token set.
+ * ---------------------------------------------------------------------------
+ */
+@theme {
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+
+  --color-bg: #f6f8fb;
+  --color-surface: #ffffff;
+  --color-surface2: #eef2f7;
+  --color-border: #e1e7ef;
+  --color-ink: #0f1a2b;
+  --color-muted: #5b6b82;
+  --color-sidebar: #0b2038;
+  --color-accent: #1f6feb;
+  --color-accent-soft: #e7f0ff;
+  --color-success: #15803d;
+  --color-danger: #dc2626;
+  --color-warning: #b45309;
+}
+
+:root.dark {
+  --color-bg: #0b1220;
+  --color-surface: #111a2b;
+  --color-surface2: #1a2740;
+  --color-border: #233150;
+  --color-ink: #e6edf7;
+  --color-muted: #93a1b8;
+  --color-sidebar: #070c17;
+  --color-accent: #4f8bff;
+  --color-accent-soft: #16233d;
+  --color-success: #4ade80;
+  --color-danger: #f87171;
+  --color-warning: #fbbf24;
+}
+
+@layer base {
+  body {
+    @apply bg-bg text-ink;
+  }
+
+  input[type='text'],
+  input[type='email'],
+  input[type='password'],
+  input[type='number'],
+  input[type='tel'],
+  input[type='file'],
+  textarea,
+  select {
+    @apply mt-1.5 block w-full rounded-lg border border-border bg-bg px-3.5 py-3 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent-soft;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply rounded-lg bg-accent px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60;
+  }
+
+  .btn-secondary {
+    @apply rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-bold text-ink disabled:opacity-60;
+  }
+
+  .card {
+    @apply rounded-xl border border-border bg-surface;
+  }
+}

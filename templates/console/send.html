@@ -1,0 +1,41 @@
+{% extends "layout/admin_shell.html" %}
+{% block title %}Send campaign — Reachly Admin{% endblock %}
+{% block page_content %}
+<h1 class="mb-1 text-2xl font-extrabold text-ink">Send platform campaign</h1>
+<p class="mb-6 text-sm text-muted">Admin sends are not charged to a wallet — cost is tracked for your own reporting.</p>
+<form method="post" class="card mb-8 max-w-3xl p-5 sm:p-6">
+  {% csrf_token %}<input type="hidden" name="form" value="rate">
+  <h3 class="mb-3 text-sm font-bold text-ink">Platform selling rate (charged to users)</h3>
+  <div class="flex flex-wrap items-end gap-4">
+    <div><div class="text-xs font-bold text-muted">GENERIC (₦/segment)</div><input type="number" step="0.01" name="generic_rate" value="{{ rate.generic_rate }}" class="!w-32"></div>
+    <div><div class="text-xs font-bold text-muted">DND (₦/segment)</div><input type="number" step="0.01" name="dnd_rate" value="{{ rate.dnd_rate }}" class="!w-32"></div>
+    <button type="submit" class="btn-primary mb-0.5" style="background:#9333ea">Save rate</button>
+  </div>
+</form>
+{% if not sender_ids %}<div class="mb-4 max-w-3xl rounded-lg bg-warning/10 px-3.5 py-3 text-sm font-semibold text-warning">No active Sender ID on the platform yet.</div>{% endif %}
+<form method="post" class="card mb-8 flex max-w-3xl flex-col gap-5 p-5 sm:p-7">
+  {% csrf_token %}
+  <div><label class="text-xs font-bold text-muted">SENDER ID</label><select name="sender_id">{% for s in sender_ids %}<option value="{{ s.name }}">{{ s.name }}</option>{% endfor %}</select></div>
+  <div><div class="mb-2 text-xs font-bold text-muted">CHANNEL</div><div class="flex gap-2">
+    <label class="cursor-pointer rounded-lg border border-border px-3.5 py-2 text-sm font-semibold has-[:checked]:bg-accent-soft has-[:checked]:text-accent"><input type="radio" name="channel" value="generic" class="hidden" checked> Generic</label>
+    <label class="cursor-pointer rounded-lg border border-border px-3.5 py-2 text-sm font-semibold has-[:checked]:bg-accent-soft has-[:checked]:text-accent"><input type="radio" name="channel" value="dnd" class="hidden"> DND</label></div></div>
+  <div><label class="text-xs font-bold text-muted">MESSAGE</label><textarea name="message" required class="min-h-[120px]" placeholder="Platform-wide announcement...">{{ posted.message }}</textarea></div>
+  <div><div class="mb-2 text-xs font-bold text-muted">TARGET</div>
+    <select name="target" id="target"><option value="all">All users ({{ user_count }})</option><option value="group">Contact group</option><option value="custom">Custom list</option></select>
+    <select name="group_id" id="group_id" class="hidden">{% for g in groups %}<option value="{{ g.pk }}">{{ g.name }} ({{ g.n }})</option>{% empty %}<option value="">No groups — create one in Contacts</option>{% endfor %}</select>
+    <textarea name="manual_numbers" id="manual" class="hidden min-h-[80px]" placeholder="2348012345678, 2348023456789, ..."></textarea></div>
+  <button type="submit" class="rounded-lg bg-purple-600 py-3.5 text-sm font-bold text-white">Send campaign</button>
+</form>
+<script>
+  var t = document.getElementById('target');
+  function sync() { document.getElementById('group_id').classList.toggle('hidden', t.value !== 'group'); document.getElementById('manual').classList.toggle('hidden', t.value !== 'custom'); }
+  t.addEventListener('change', sync); sync();
+</script>
+<h3 class="mb-3 text-base font-bold text-ink">Admin campaign history</h3>
+<div class="card max-w-4xl overflow-x-auto"><div class="min-w-[560px]">
+  <div class="grid grid-cols-4 border-b border-border px-4 py-3 text-xs font-bold text-muted"><span>CAMPAIGN</span><span>RECIPIENTS</span><span>COST</span><span>DATE</span></div>
+  {% for c in page %}<div class="grid grid-cols-4 border-b border-border px-4 py-3.5 text-sm last:border-b-0"><span class="truncate pr-2 font-semibold">{{ c.message|truncatechars:36 }}</span><span class="text-muted">{{ c.total_recipients }}</span><span class="text-muted">₦{{ c.termii_cost|floatformat:2 }}</span><span class="text-muted">{{ c.created_at|date:"M j, Y" }}</span></div>
+  {% empty %}<div class="px-4 py-5 text-sm text-muted">No admin campaigns sent yet.</div>{% endfor %}
+</div></div>
+{% include "includes/pagination.html" %}
+{% endblock %}

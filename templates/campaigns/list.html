@@ -1,0 +1,31 @@
+{% extends "layout/user_shell.html" %}
+{% load static %}
+{% block title %}Campaigns — Reachly{% endblock %}
+{% block page_content %}
+<div class="mb-6 flex items-center justify-between">
+  <h1 class="text-2xl font-extrabold text-ink">Campaigns</h1>
+  <a href="{% url 'web-campaign-new' %}" class="btn-primary">New campaign</a>
+</div>
+<div class="card overflow-x-auto">
+  <div class="min-w-[640px]">
+    <div class="grid grid-cols-5 border-b border-border px-4 py-3 text-xs font-bold text-muted">
+      <span>CAMPAIGN</span><span>RECIPIENTS</span><span>COST</span><span>STATUS</span><span>DATE</span>
+    </div>
+    {% for c in page %}
+    <a href="{% url 'web-campaign-detail' c.pk %}" class="grid grid-cols-5 items-center border-b border-border px-4 py-3.5 text-sm last:border-b-0 hover:bg-bg">
+      <span class="truncate pr-2 font-semibold text-ink">{{ c.message|truncatechars:40 }}</span>
+      <span class="text-muted">{{ c.total_recipients }}</span>
+      <span class="text-muted">₦{{ c.total_cost|floatformat:2 }}</span>
+      {% include "includes/status_badge.html" with status=c.status %}
+      <span class="text-muted">{{ c.created_at|date:"M j, Y" }}</span>
+    </a>
+    {% empty %}
+    <div class="flex flex-col items-center px-4 py-10 text-center">
+      <img src="{% static 'illustrations/sending-message.svg' %}" alt="" class="mb-3 w-56" onerror="this.remove()">
+      <p class="text-sm text-muted">No campaigns yet — send your first one.</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% include "includes/pagination.html" %}
+{% endblock %}

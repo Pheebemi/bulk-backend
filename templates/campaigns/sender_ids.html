@@ -1,0 +1,34 @@
+{% extends "layout/user_shell.html" %}
+{% block title %}Sender IDs — Reachly{% endblock %}
+{% block page_content %}
+<h1 class="mb-6 text-2xl font-extrabold text-ink">Sender IDs</h1>
+<div class="grid max-w-5xl grid-cols-1 gap-6 lg:grid-cols-[1.3fr_1fr]">
+  <div>
+    <div class="card overflow-hidden">
+      {% for s in owned %}
+      <div class="flex items-center justify-between border-b border-border px-4 py-3.5 text-sm last:border-b-0">
+        <span class="font-bold">{{ s.name }}</span>
+        <span class="rounded-full px-2.5 py-1 text-xs font-bold capitalize {% if s.platform_status == 'active' %}bg-success/10 text-success{% elif s.platform_status == 'blocked' %}bg-danger/10 text-danger{% else %}bg-warning/10 text-warning{% endif %}">{{ s.platform_status }}</span>
+      </div>
+      {% empty %}
+      <div class="px-4 py-5 text-sm text-muted">You haven't requested any Sender IDs yet.</div>
+      {% endfor %}
+    </div>
+    {% if shared %}
+    <h3 class="mb-2 mt-6 text-sm font-bold text-muted">AVAILABLE TO EVERYONE</h3>
+    <div class="card overflow-hidden">
+      {% for s in shared %}<div class="border-b border-border px-4 py-3 text-sm font-semibold last:border-b-0">{{ s.name }}</div>{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  <form method="post" class="card h-fit p-5">
+    {% csrf_token %}
+    <h3 class="mb-3 text-sm font-bold text-ink">Request a Sender ID</h3>
+    <label class="text-xs font-bold text-muted">NAME (max 11 characters)</label>
+    <input type="text" name="name" maxlength="11" required placeholder="MYBRAND" class="mb-4">
+    <label class="text-xs font-bold text-muted">WHAT WILL YOU USE IT FOR?</label>
+    <textarea name="use_case" required class="mb-4 min-h-[90px]" placeholder="e.g. order updates to customers"></textarea>
+    <button type="submit" class="btn-primary w-full">Request</button>
+  </form>
+</div>
+{% endblock %}

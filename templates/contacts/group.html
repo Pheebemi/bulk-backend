@@ -1,0 +1,45 @@
+{% extends names.base %}
+{% block title %}{{ group.name }} — Reachly{% endblock %}
+{% block page_content %}
+<a href="{% url names.home %}" class="mb-4 inline-block text-sm font-bold text-accent">&larr; All groups</a>
+<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+  <h1 class="text-2xl font-extrabold text-ink">{{ group.name }} <span class="text-base font-semibold text-muted">· {{ page.paginator.count }}</span></h1>
+  <form method="post" action="{% url names.group_delete group.pk %}" onsubmit="return confirm('Delete this whole group and its contacts?');">
+    {% csrf_token %}<button type="submit" class="rounded-lg border border-danger/40 px-3 py-2 text-xs font-bold text-danger">Delete group</button>
+  </form>
+</div>
+
+<div class="card overflow-hidden">
+  {% for c in page %}
+  <div class="border-b border-border px-5 py-2.5 text-sm last:border-b-0">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <span>{{ c.first_name }} {{ c.last_name }}</span>
+      <span class="flex items-center gap-3">
+        <span class="text-muted">{{ c.phone_number }}</span>
+        <button type="button" onclick="document.getElementById('edit-{{ c.pk }}').classList.toggle('hidden')" class="text-xs font-bold text-accent">Edit</button>
+        <form method="post" action="{% url names.contact_delete group.pk c.pk %}" onsubmit="return confirm('Delete this contact?');">
+          {% csrf_token %}<button type="submit" class="text-xs font-bold text-danger">Delete</button>
+        </form>
+      </span>
+    </div>
+    <form id="edit-{{ c.pk }}" method="post" action="{% url names.contact_edit group.pk c.pk %}" class="mt-2 hidden flex-wrap items-center gap-2 rounded-lg bg-bg p-3 [&:not(.hidden)]:flex">
+      {% csrf_token %}
+      <input type="text" name="first_name" value="{{ c.first_name }}" placeholder="First name" class="!mt-0 !w-28 !px-2.5 !py-1.5 !text-xs">
+      <input type="text" name="last_name" value="{{ c.last_name }}" placeholder="Last name" class="!mt-0 !w-28 !px-2.5 !py-1.5 !text-xs">
+      <input type="text" name="phone_number" value="{{ c.phone_number }}" placeholder="Phone number" required class="!mt-0 !w-36 !px-2.5 !py-1.5 !text-xs">
+      <button type="submit" class="btn-primary !px-3 !py-1.5 !text-xs">Save</button>
+    </form>
+  </div>
+  {% empty %}
+  <div class="px-5 py-4 text-sm text-muted">No contacts in this group yet.</div>
+  {% endfor %}
+  <form method="post" class="flex flex-wrap items-center gap-2 border-t border-border bg-bg/40 px-5 py-3">
+    {% csrf_token %}
+    <input type="text" name="first_name" placeholder="First name" class="!mt-0 !w-28 !px-2.5 !py-1.5 !text-xs">
+    <input type="text" name="last_name" placeholder="Last name" class="!mt-0 !w-28 !px-2.5 !py-1.5 !text-xs">
+    <input type="text" name="phone_number" placeholder="Phone number" required class="!mt-0 !w-36 !px-2.5 !py-1.5 !text-xs">
+    <button type="submit" class="btn-primary !px-3 !py-1.5 !text-xs">Add contact</button>
+  </form>
+</div>
+{% include "includes/pagination.html" %}
+{% endblock %}

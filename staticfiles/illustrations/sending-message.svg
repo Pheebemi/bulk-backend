@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 420" fill="none">
+  <ellipse cx="240" cy="380" rx="180" ry="24" fill="#0b2038" opacity="0.06"/>
+
+  <!-- Phone body -->
+  <rect x="150" y="90" width="150" height="270" rx="22" fill="#0b2038"/>
+  <rect x="162" y="112" width="126" height="206" rx="4" fill="url(#screenShade)"/>
+  <circle cx="225" cy="336" r="10" fill="#1a2740" opacity="0.4"/>
+
+  <!-- Chat bubbles on screen -->
+  <rect x="174" y="128" width="78" height="24" rx="12" fill="#e7f0ff"/>
+  <rect x="192" y="162" width="84" height="24" rx="12" fill="#1f6feb"/>
+  <rect x="174" y="196" width="66" height="24" rx="12" fill="#e7f0ff"/>
+
+  <!-- Outgoing message card, flying off to the right -->
+  <g transform="rotate(8 372 150)">
+    <rect x="320" y="112" width="104" height="76" rx="14" fill="#ffffff" stroke="#e1e7ef" stroke-width="2"/>
+    <circle cx="344" cy="138" r="10" fill="#1f6feb"/>
+    <rect x="362" y="132" width="48" height="8" rx="4" fill="#e1e7ef"/>
+    <rect x="362" y="146" width="34" height="8" rx="4" fill="#e1e7ef"/>
+    <rect x="336" y="162" width="72" height="8" rx="4" fill="#e7f0ff"/>
+  </g>
+
+  <!-- Motion dots trailing the message -->
+  <circle cx="300" cy="170" r="6" fill="#1f6feb" opacity="0.8"/>
+  <circle cx="284" cy="184" r="5" fill="#1f6feb" opacity="0.55"/>
+  <circle cx="270" cy="196" r="4" fill="#1f6feb" opacity="0.35"/>
+
+  <!-- Paper-plane badge -->
+  <circle cx="392" cy="252" r="30" fill="#ffd34d"/>
+  <path d="M378 252l34-16-14 34-6-12-14-6z" fill="#0b2038"/>
+
+  <!-- Accent dots -->
+  <circle cx="110" cy="130" r="9" fill="#1f6feb" opacity="0.5"/>
+  <circle cx="96" cy="300" r="12" fill="#ffd34d" opacity="0.85"/>
+  <circle cx="400" cy="340" r="7" fill="#1f6feb" opacity="0.4"/>
+
+  <defs>
+    <linearGradient id="screenShade" x1="162" y1="112" x2="288" y2="318" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f6f8fb"/>
+      <stop offset="1" stop-color="#eef2f7"/>
+    </linearGradient>
+  </defs>
+</svg>
