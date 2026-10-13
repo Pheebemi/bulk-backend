@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 380" fill="none">
+  <defs><linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#3b82f6"/><stop offset="1" stop-color="#1f6feb"/></linearGradient></defs>
+  <circle cx="240" cy="190" r="150" fill="#e7f0ff"/>
+  <ellipse cx="240" cy="352" rx="150" ry="14" fill="#0b2038" opacity=".07"/>
+  <!-- phone -->
+  <rect x="300" y="86" width="108" height="214" rx="22" fill="#0b2038"/>
+  <rect x="309" y="102" width="90" height="182" rx="14" fill="#f6f8fb"/>
+  <path d="M352 150a22 22 0 1 0 8 31 17 17 0 0 1-8-31z" fill="#1f6feb"/>
+  <rect x="323" y="198" width="62" height="8" rx="4" fill="#0b2038" opacity=".75"/><rect x="333" y="214" width="42" height="7" rx="3.5" fill="#c4cedd"/>
+  <rect x="323" y="238" width="62" height="26" rx="13" fill="#dcfce7"/><path d="M342 251l5 5 9-10" stroke="#16a34a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- shield barrier -->
+  <path d="M206 96l54 18v50c0 38-24 62-54 74-30-12-54-36-54-74v-50z" fill="#fff" stroke="#e1e7ef" stroke-width="2"/>
+  <path d="M206 112l40 14v38c0 28-17 47-40 57-23-10-40-29-40-57v-38z" fill="url(#a)" opacity=".12"/>
+  <path d="M188 168l14 14 28-30" stroke="#1f6feb" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- messages: blocked vs passing -->
+  <g opacity=".85"><rect x="40" y="130" width="76" height="30" rx="12" fill="#fff" stroke="#e1e7ef" stroke-width="2"/><path d="M62 145h32" stroke="#c4cedd" stroke-width="5" stroke-linecap="round"/></g>
+  <circle cx="132" cy="145" r="12" fill="#fee2e2"/><path d="M127 140l10 10M137 140l-10 10" stroke="#ef4444" stroke-width="3" stroke-linecap="round"/>
+  <rect x="40" y="206" width="84" height="32" rx="13" fill="url(#a)"/><path d="M60 222h44" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+  <path d="M130 222c40 0 58-2 92 0 24 1 40 2 70 0" stroke="#1f6feb" stroke-width="3" stroke-dasharray="2 9" stroke-linecap="round"/>
+  <path d="M286 216l12 6-12 6" stroke="#1f6feb" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="84" cy="300" r="8" fill="#ffd34d"/><circle cx="420" cy="70" r="8" fill="#ff7a59" opacity=".8"/><circle cx="54" cy="70" r="6" fill="#1f6feb" opacity=".4"/>
+</svg>

@@ -97,3 +97,20 @@
 .toast-in.toast-out { animation: toast-out 0.2s ease-in both; }
 
 html { scroll-behavior: smooth; }
+
+/* ---- Landing page polish ---- */
+@keyframes float-y { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+@keyframes blob-drift { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(24px,-18px) scale(1.08); } }
+.float-slow { animation: float-y 6s ease-in-out infinite; }
+.blob { animation: blob-drift 14s ease-in-out infinite; }
+.bg-dots {
+  background-image: radial-gradient(color-mix(in srgb, var(--color-ink) 14%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.js .reveal { opacity: 0; transform: translateY(26px); transition: opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1); transition-delay: var(--d, 0ms); }
+.js .reveal.is-visible { opacity: 1; transform: none; }
+.glass { background: color-mix(in srgb, var(--color-surface) 72%, transparent); backdrop-filter: blur(14px); }
+@media (prefers-reduced-motion: reduce) {
+  .float-slow, .blob { animation: none; }
+  .js .reveal { opacity: 1; transform: none; transition: none; }
+}

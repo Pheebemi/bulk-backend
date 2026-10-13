@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 300" fill="none">
+  <defs><linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#3b82f6"/><stop offset="1" stop-color="#1f6feb"/></linearGradient></defs>
+  <ellipse cx="240" cy="274" rx="170" ry="12" fill="#0b2038" opacity=".07"/>
+  <rect x="48" y="40" width="384" height="190" rx="24" fill="#fff" stroke="#e1e7ef" stroke-width="2"/>
+  <rect x="76" y="66" width="140" height="11" rx="5.5" fill="#0b2038" opacity=".85"/><rect x="76" y="86" width="190" height="8" rx="4" fill="#c4cedd"/>
+  <g>
+    <rect x="76" y="120" width="46" height="62" rx="12" fill="#f1f5fb" stroke="#d6e4ff" stroke-width="2"/><text x="99" y="161" text-anchor="middle" font-family="Arial,sans-serif" font-size="30" font-weight="800" fill="#1f6feb">4</text>
+    <rect x="132" y="120" width="46" height="62" rx="12" fill="#f1f5fb" stroke="#d6e4ff" stroke-width="2"/><text x="155" y="161" text-anchor="middle" font-family="Arial,sans-serif" font-size="30" font-weight="800" fill="#1f6feb">0</text>
+    <rect x="188" y="120" width="46" height="62" rx="12" fill="#f1f5fb" stroke="#d6e4ff" stroke-width="2"/><text x="211" y="161" text-anchor="middle" font-family="Arial,sans-serif" font-size="30" font-weight="800" fill="#1f6feb">2</text>
+    <rect x="244" y="120" width="46" height="62" rx="12" fill="#f1f5fb" stroke="#d6e4ff" stroke-width="2"/><text x="267" y="161" text-anchor="middle" font-family="Arial,sans-serif" font-size="30" font-weight="800" fill="#1f6feb">9</text>
+    <rect x="300" y="120" width="46" height="62" rx="12" fill="#fff" stroke="#1f6feb" stroke-width="2.5"/><rect x="320" y="136" width="3" height="30" rx="1.5" fill="#1f6feb"/>
+  </g>
+  <rect x="76" y="198" width="120" height="8" rx="4" fill="#e7f0ff"/>
+  <g transform="translate(386 128)"><path d="M0-62l50 18v42c0 32-20 54-50 66-30-12-50-34-50-66v-42z" fill="url(#a)"/><rect x="-18" y="-6" width="36" height="30" rx="7" fill="#fff"/><path d="M-10-6v-9a10 10 0 0 1 20 0v9" stroke="#fff" stroke-width="5" stroke-linecap="round"/><circle cy="9" r="4" fill="#1f6feb"/></g>
+  <circle cx="454" cy="226" r="8" fill="#ffd34d"/><circle cx="26" cy="90" r="8" fill="#ff7a59" opacity=".8"/>
+</svg>

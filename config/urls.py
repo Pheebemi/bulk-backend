@@ -20,10 +20,26 @@ def home(request):
     from django.shortcuts import render
 
     from apps.accounts import landing_content as c
+    from apps.campaigns.models import PlatformRate
+
+    # Live selling rates on the pricing cards; fall back to the model
+    # defaults if the database is unreachable so the landing never 500s.
+    try:
+        rate = PlatformRate.current()
+        generic_rate, dnd_rate = rate.generic_rate, rate.dnd_rate
+    except Exception:
+        generic_rate, dnd_rate = '8.00', '10.00'
 
     return render(request, 'landing.html', {
         'use_cases': c.USE_CASES, 'industries': c.INDUSTRIES, 'features': c.FEATURES,
         'faqs': c.FAQS, 'checklist': c.CHECKLIST,
+        'generic_rate': generic_rate, 'dnd_rate': dnd_rate,
+        'stats': [('4', 'Networks covered'), ('DND', 'Route included'), ('160', 'Characters / segment'), ('₦0', 'Monthly fee')],
+        'steps': [
+            ('1', 'Create & fund', 'Sign up in a minute and top up your wallet by card or transfer — no subscription.', 'illustrations/wallet.svg'),
+            ('2', 'Add your contacts', 'Upload a CSV or add numbers by hand, grouped the way you actually message.', 'illustrations/contacts.svg'),
+            ('3', 'Send & track', 'See the exact cost first, send, then watch delivery per recipient.', 'illustrations/reports.svg'),
+        ],
     })
 
 

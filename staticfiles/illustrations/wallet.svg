@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 380" fill="none">
+  <defs><linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#3b82f6"/><stop offset="1" stop-color="#1d4ed8"/></linearGradient></defs>
+  <circle cx="240" cy="190" r="150" fill="#e7f0ff"/>
+  <ellipse cx="240" cy="346" rx="160" ry="14" fill="#0b2038" opacity=".07"/>
+  <!-- wallet -->
+  <rect x="100" y="140" width="250" height="170" rx="26" fill="#0b2038"/>
+  <rect x="100" y="140" width="250" height="170" rx="26" fill="url(#a)" opacity=".25"/>
+  <path d="M100 176h250" stroke="#fff" stroke-opacity=".08" stroke-width="2"/>
+  <rect x="290" y="204" width="86" height="54" rx="18" fill="#ffd34d"/><circle cx="320" cy="231" r="8" fill="#0b2038"/>
+  <!-- card poking out -->
+  <g transform="rotate(-8 220 140)"><rect x="124" y="74" width="214" height="124" rx="18" fill="url(#a)"/>
+  <rect x="146" y="98" width="42" height="30" rx="7" fill="#ffd34d"/><path d="M146 113h42M167 98v30" stroke="#b8860b" stroke-opacity=".5"/>
+  <rect x="146" y="150" width="120" height="9" rx="4.5" fill="#fff" opacity=".9"/><rect x="146" y="168" width="70" height="8" rx="4" fill="#fff" opacity=".55"/>
+  <circle cx="300" cy="170" r="14" fill="#fff" opacity=".3"/><circle cx="314" cy="170" r="14" fill="#fff" opacity=".55"/></g>
+  <!-- coins -->
+  <g><ellipse cx="404" cy="318" rx="34" ry="12" fill="#e0a800"/><rect x="370" y="296" width="68" height="22" fill="#ffd34d"/><ellipse cx="404" cy="296" rx="34" ry="12" fill="#ffe27a"/>
+  <ellipse cx="404" cy="278" rx="34" ry="12" fill="#e0a800"/><rect x="370" y="256" width="68" height="22" fill="#ffd34d"/><ellipse cx="404" cy="256" rx="34" ry="12" fill="#ffe27a"/>
+  <path d="M396 252v8m16-8v8M392 256h24M392 260h24" stroke="#b8860b" stroke-width="2.5" stroke-linecap="round" transform="translate(0 0)"/></g>
+  <circle cx="60" cy="110" r="9" fill="#ff7a59" opacity=".8"/><circle cx="430" cy="90" r="8" fill="#1f6feb" opacity=".4"/><circle cx="80" cy="300" r="7" fill="#ffd34d"/>
+</svg>
