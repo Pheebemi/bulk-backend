@@ -1,0 +1,7 @@
+<div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#0f1a2b">
+  <div style="font-size:20px;font-weight:800;color:#1f6feb;margin-bottom:16px">Reachly</div>
+  <p style="font-size:15px;line-height:1.5">Hi{% if user.full_name %} {{ user.full_name }}{% endif %}, good news — your sender ID is approved and ready to use:</p>
+  <div style="font-size:28px;font-weight:800;letter-spacing:3px;background:#e7f0ff;color:#1f6feb;text-align:center;padding:16px;border-radius:12px;margin:16px 0">{{ sender.name }}</div>
+  <p style="font-size:14px;line-height:1.5;color:#5b6b82">Pick it as the sender when you create your next campaign.</p>
+  <p style="margin-top:20px"><a href="{{ site_url }}/campaigns/new/" style="background:#1f6feb;color:#fff;text-decoration:none;padding:10px 18px;border-radius:10px;font-weight:700;font-size:14px">Send a campaign</a></p>
+</div>

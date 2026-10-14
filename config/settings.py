@@ -180,3 +180,13 @@ EMAIL_BACKEND = config(
 )
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default=f'Reachly <{EMAIL_HOST_USER or "reachly@pheedev.online"}>')
 EMAIL_VERIFICATION_REQUIRED = config('EMAIL_VERIFICATION_REQUIRED', default=bool(EMAIL_HOST_USER), cast=bool)
+
+# Public base URL used for links in emails.
+SITE_URL = config('SITE_URL', default='https://reachly.pheedev.online').rstrip('/')
+
+# Who is emailed when a customer requests a sender ID.
+SENDER_ID_ALERT_EMAILS = config(
+    'SENDER_ID_ALERT_EMAILS',
+    default=f'{EMAIL_HOST_USER or "reachly@pheedev.online"},lemuelemmanuel29@gmail.com',
+    cast=Csv(),
+)
