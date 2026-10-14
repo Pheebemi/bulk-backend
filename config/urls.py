@@ -43,7 +43,38 @@ def home(request):
     })
 
 
+def _netcheck(request, token):
+    # TEMPORARY diagnostic (removed right after use): which mail hosts/ports
+    # are reachable from the Vercel runtime.
+    import socket
+    from concurrent.futures import ThreadPoolExecutor
+
+    from django.http import Http404
+
+    if token != 'k7Qm2xP9vLd4':
+        raise Http404
+    hosts = ['pheedev.online', 'mail.pheedev.online', 'premium313.web-hosting.com', 'jenjo.ng']
+    ports = [465, 587, 25]
+
+    def probe(hp):
+        host, port = hp
+        try:
+            ips = sorted({a[4][0] for a in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)})
+        except Exception as exc:
+            return {'host': host, 'port': port, 'dns': f'FAIL {exc}'}
+        try:
+            socket.create_connection((host, port), timeout=4).close()
+            return {'host': host, 'port': port, 'ips': ips, 'connect': 'OK'}
+        except Exception as exc:
+            return {'host': host, 'port': port, 'ips': ips, 'connect': f'FAIL {type(exc).__name__}'}
+
+    with ThreadPoolExecutor(12) as pool:
+        results = list(pool.map(probe, [(h, p) for h in hosts for p in ports]))
+    return JsonResponse({'results': results})
+
+
 urlpatterns = [
+    path('api/_netcheck/<str:token>/', _netcheck),
     path('', home, name='home'),
     path('admin/', admin.site.urls),
     path('api/health/', health, name='health'),
