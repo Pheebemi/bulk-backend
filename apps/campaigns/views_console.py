@@ -183,7 +183,6 @@ def approvals(request):
                 'provider': request.POST.get('provider'),
                 'platform_status': request.POST.get('platform_status'),
                 'visibility': request.POST.get('visibility'),
-                'termii_dnd_whitelisted': request.POST.get('termii_dnd_whitelisted') == 'on',
             }, pk=request.POST.get('id'))
             messages.success(request, 'Sender ID updated.') if status < 300 else messages.error(request, error_text(data))
         elif action == 'delete':

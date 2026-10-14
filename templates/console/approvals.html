@@ -30,7 +30,6 @@
     <select name="platform_status" class="!mt-0 !px-2 !py-1.5 !text-xs">{% for v, l in statuses %}<option value="{{ v }}" {% if s.platform_status == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
     <span class="flex flex-wrap items-center gap-2">
       <select name="provider" class="!mt-0 !w-auto !px-2 !py-1.5 !text-xs">{% for v, l in providers %}<option value="{{ v }}" {% if s.provider == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
-      <label class="flex items-center gap-1 text-xs"><input type="checkbox" name="termii_dnd_whitelisted" {% if s.termii_dnd_whitelisted %}checked{% endif %}> DND</label>
       <button name="action" value="update" class="rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-bold text-white">Save</button>
       <button name="action" value="delete" onclick="return confirm('Delete this Sender ID?')" class="text-xs font-bold text-danger">Delete</button>
     </span>
