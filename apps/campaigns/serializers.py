@@ -121,7 +121,7 @@ class CampaignSerializer(serializers.ModelSerializer):
     class Meta:
         model = Campaign
         fields = [
-            'id', 'is_admin_campaign', 'provider', 'sender_id', 'message', 'channel',
+            'id', 'is_admin_campaign', 'scheduled_at', 'provider', 'sender_id', 'message', 'channel',
             'termii_campaign_id', 'total_recipients', 'delivered', 'failed',
             'total_cost', 'termii_cost', 'status', 'created_at',
         ]
@@ -162,6 +162,22 @@ class CampaignCreateSerializer(serializers.Serializer):
     channel = serializers.ChoiceField(choices=['generic', 'dnd'])
     group_id = serializers.IntegerField(required=False)
     manual_numbers = serializers.ListField(child=serializers.CharField(), required=False)
+    # Optional: hold the campaign and send it at this time instead of now.
+    scheduled_at = serializers.DateTimeField(required=False, allow_null=True)
+
+    def validate_scheduled_at(self, value):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        if value is None:
+            return value
+        now = timezone.now()
+        if value < now + timedelta(minutes=2):
+            raise serializers.ValidationError('Pick a time at least a few minutes from now.')
+        if value > now + timedelta(days=60):
+            raise serializers.ValidationError('You can schedule up to 60 days ahead.')
+        return value
 
     def validate(self, attrs):
         if not attrs.get('group_id') and not attrs.get('manual_numbers'):

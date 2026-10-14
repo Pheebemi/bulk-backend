@@ -7,7 +7,7 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.utils import log_wallet_transaction, send_html_email
+from apps.accounts.utils import check_low_balance, log_wallet_transaction, send_html_email
 from integrations.flutterwave import FlutterwaveError, flutterwave
 
 from .models import PaymentTransaction
@@ -30,6 +30,7 @@ def _credit_wallet_if_new(user, tx_ref: str, transaction_id: str, amount: Decima
             wallet.balance += amount
             wallet.save(update_fields=['balance'])
             log_wallet_transaction(user, amount, 'Wallet funding (Flutterwave)')
+        check_low_balance(user)
         # Only the call that actually credited sends these, so the verify
         # call and the webhook landing together never double-notify.
         ctx = {'user': user, 'amount': amount, 'balance': user.wallet.balance, 'tx_ref': tx_ref, 'site_url': settings.SITE_URL}

@@ -101,6 +101,9 @@ class PlatformRate(models.Model):
 class Campaign(models.Model):
     STATUS_CHOICES = (
         ('PENDING', 'Pending'),
+        # Funds are reserved; the cron tick moves it to PROCESSING at scheduled_at.
+        ('SCHEDULED', 'Scheduled'),
+        ('CANCELLED', 'Cancelled'),
         ('PROCESSING', 'Processing'),
         ('DELIVERED', 'Delivered'),
         # Some chunks reached the provider and some did not; the unsent
@@ -159,6 +162,8 @@ class Campaign(models.Model):
     # is our problem to fix, not something naming "Sendchamp" or "Termii"
     # to a customer would help them understand or act on.
     provider_error = models.TextField(blank=True)
+    # When a SCHEDULED campaign should go out (null for send-now campaigns).
+    scheduled_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

@@ -6,12 +6,14 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from apps.accounts.web_utils import call_api, customer_required, error_text
 from apps.contacts.models import ContactGroup
 
 from .models import Campaign, PlatformRate, SenderID
 from .views import (
+    CampaignCancelView,
     CampaignListCreateView,
     SenderIDListCreateView,
     _refresh_campaign_from_termii,
@@ -34,13 +36,17 @@ def campaign_new(request):
             'message': request.POST.get('message', ''),
             'channel': request.POST.get('channel', 'dnd'),
         }
+        if request.POST.get('send_when') == 'later':
+            # <input type="datetime-local"> sends a naive local time; DRF reads
+            # it in the project timezone (Africa/Lagos).
+            payload['scheduled_at'] = request.POST.get('scheduled_for') or None
         if request.POST.get('source') == 'manual':
             payload['manual_numbers'] = manual
         else:
             payload['group_id'] = request.POST.get('group_id') or None
         status, data = call_api(CampaignListCreateView, request.user, 'post', payload)
         if status < 300:
-            messages.success(request, 'Campaign submitted.')
+            messages.success(request, 'Campaign scheduled.' if data.get('status') == 'SCHEDULED' else 'Campaign submitted.')
             return redirect('web-campaign-detail', pk=data['id'])
         messages.error(request, error_text(data))
 
@@ -59,6 +65,17 @@ def campaign_new(request):
         }),
         'posted': request.POST,
     })
+
+
+@customer_required
+@require_POST
+def campaign_cancel(request, pk):
+    status, data = call_api(CampaignCancelView, request.user, 'post', {}, pk=pk)
+    if status < 300:
+        messages.success(request, 'Campaign cancelled — your wallet has been refunded.')
+    else:
+        messages.error(request, error_text(data))
+    return redirect('web-campaign-detail', pk=pk)
 
 
 @customer_required

@@ -15,6 +15,15 @@
   <button type="submit" class="btn-primary px-6 py-3">Claim ₦{{ bonus_amount }}</button>
 </form>
 {% endif %}
+{% if low_balance %}
+<div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-warning/40 bg-warning/10 p-5">
+  <div class="flex items-center gap-3">
+    <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-warning text-lg font-extrabold text-white">!</span>
+    <div><div class="font-extrabold text-ink">Your balance is low — ₦{{ balance|floatformat:2 }}</div><div class="text-sm text-muted">Top up so your campaigns, including scheduled ones, aren't held up.</div></div>
+  </div>
+  <a href="{% url 'web-wallet' %}" class="btn-primary px-6 py-3">Top up wallet</a>
+</div>
+{% endif %}
 <div class="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-3">
   <div class="card p-5">
     <div class="mb-2 text-sm font-semibold text-muted">Wallet balance</div>

@@ -191,3 +191,6 @@ SENDER_ID_ALERT_EMAILS = config(
     default=f'{EMAIL_HOST_USER or "reachly@pheedev.online"},lemuelemmanuel29@gmail.com',
     cast=Csv(),
 )
+
+# Wallets below this (₦) get a dashboard banner and a one-off email.
+LOW_BALANCE_THRESHOLD_NGN = config('LOW_BALANCE_THRESHOLD_NGN', default=500, cast=int)

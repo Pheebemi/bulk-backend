@@ -84,6 +84,8 @@ def dashboard_view(request):
         'campaigns_sent': user_campaigns.count(),
         'recipients_reached': recipients_reached,
         'recent_campaigns': recent,
+        'low_balance': request.user.wallet.balance < settings.LOW_BALANCE_THRESHOLD_NGN,
+        'low_balance_threshold': settings.LOW_BALANCE_THRESHOLD_NGN,
         'bonus_amount': settings.SIGNUP_BONUS_NGN,
         'can_claim_bonus': settings.SIGNUP_BONUS_NGN > 0 and not request.user.wallet.welcome_bonus_claimed,
     }

@@ -56,6 +56,30 @@ def send_html_email(subject: str, template: str, context: dict, to: list) -> Non
         logger.exception('Email failed (%s -> %s)', subject, to)
 
 
+def check_low_balance(user, *, notify: bool = False) -> None:
+    """Keeps Wallet.low_balance_notified in step with the balance. With
+    notify=True (call it right after a debit) and the balance under
+    settings.LOW_BALANCE_THRESHOLD_NGN, emails the customer once; the flag
+    is cleared again when the balance recovers, so the next dip emails
+    again. Credits/refunds call it with notify=False just to reset."""
+    threshold = Decimal(str(settings.LOW_BALANCE_THRESHOLD_NGN))
+    wallet = Wallet.objects.filter(user=user).first()
+    if not wallet or threshold <= 0:
+        return
+    if wallet.balance >= threshold:
+        if wallet.low_balance_notified:
+            Wallet.objects.filter(pk=wallet.pk).update(low_balance_notified=False)
+        return
+    if notify and not wallet.low_balance_notified:
+        # Conditional update claims the email, so two concurrent sends can't both send it.
+        if Wallet.objects.filter(pk=wallet.pk, low_balance_notified=False).update(low_balance_notified=True):
+            send_html_email(
+                'Your ReachlySMS balance is running low', 'accounts/email_low_balance.html',
+                {'user': user, 'balance': wallet.balance, 'threshold': threshold, 'site_url': settings.SITE_URL},
+                [user.email],
+            )
+
+
 def send_verification_code(user) -> None:
     """Emails a fresh 6-digit code (replacing any live one). Raises if the
     mail can't be sent, so callers can tell the user instead of pretending."""

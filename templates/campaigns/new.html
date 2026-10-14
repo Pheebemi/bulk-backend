@@ -53,13 +53,28 @@
         <textarea name="manual_numbers" id="manual" class="min-h-[80px]" placeholder="2348012345678, 2348023456789, ..."></textarea>
       </div>
     </div>
+    <div>
+      <div class="mb-2 text-xs font-bold text-muted">WHEN</div>
+      <div class="mb-3 flex flex-wrap gap-2">
+        <label class="cursor-pointer rounded-lg border border-border px-3.5 py-2 text-sm font-semibold has-[:checked]:bg-accent-soft has-[:checked]:text-accent">
+          <input type="radio" name="send_when" value="now" class="hidden" checked> Send now
+        </label>
+        <label class="cursor-pointer rounded-lg border border-border px-3.5 py-2 text-sm font-semibold has-[:checked]:bg-accent-soft has-[:checked]:text-accent">
+          <input type="radio" name="send_when" value="later" class="hidden"> Schedule for later
+        </label>
+      </div>
+      <div id="when-box" class="hidden">
+        <input type="datetime-local" name="scheduled_for" id="scheduled_for" class="!mt-0">
+        <p class="mt-1.5 text-xs text-muted">Lagos time. The cost is reserved from your wallet now and refunded if you cancel before it starts.</p>
+      </div>
+    </div>
   </div>
 
   <div class="card h-fit p-5 sm:p-7">
     <div class="mb-4"><div class="mb-1.5 text-xs font-bold text-muted">RECIPIENTS</div><div id="est-recipients" class="text-xl font-extrabold text-ink">0</div></div>
     <div class="mb-4"><div class="mb-1.5 text-xs font-bold text-muted">ESTIMATED COST</div><div id="est-cost" class="text-2xl font-extrabold text-accent">₦0.00</div></div>
     <div class="mb-4 text-xs text-muted">Wallet balance: <b>₦{{ request.user.wallet.balance|floatformat:2 }}</b></div>
-    <button type="submit" class="btn-primary w-full py-3.5">Send campaign</button>
+    <button type="submit" id="submit-btn" class="btn-primary w-full py-3.5">Send campaign</button>
   </div>
 </form>
 {{ config_json|json_script:"cfg" }}
@@ -84,6 +99,11 @@
     document.getElementById('est-cost').textContent = '₦' + (count * seg * cfg[channel]).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
     document.getElementById('group-box').classList.toggle('hidden', source !== 'group');
     document.getElementById('manual-box').classList.toggle('hidden', source !== 'manual');
+    var later = form.send_when.value === 'later', when = document.getElementById('scheduled_for');
+    document.getElementById('when-box').classList.toggle('hidden', !later);
+    when.required = later;
+    if (later && !when.min) { var d = new Date(Date.now() + 5 * 60000 - new Date().getTimezoneOffset() * 60000); when.min = d.toISOString().slice(0, 16); }
+    document.getElementById('submit-btn').textContent = later ? 'Schedule campaign' : 'Send campaign';
   }
   form.addEventListener('input', update); form.addEventListener('change', update); update();
 })();

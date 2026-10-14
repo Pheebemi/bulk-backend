@@ -56,6 +56,9 @@ class Wallet(models.Model):
     # New wallets start unclaimed; the customer taps "Claim" to receive the
     # welcome bonus once (see utils.claim_welcome_bonus).
     welcome_bonus_claimed = models.BooleanField(default=False)
+    # True once the low-balance email went out for the current dip below the
+    # threshold; cleared when the balance recovers, so each dip emails once.
+    low_balance_notified = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):

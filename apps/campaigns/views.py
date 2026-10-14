@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.conf import settings
+from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Count, Q, Sum, Value
@@ -11,7 +12,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import Wallet
-from apps.accounts.utils import log_wallet_transaction
+from apps.accounts.utils import check_low_balance, log_wallet_transaction
 from apps.contacts.models import ContactGroup
 from config.pagination import CampaignHistoryPagination, StandardResultsPagination
 from integrations.termii import TermiiError, termii
@@ -205,7 +206,9 @@ class CampaignListCreateView(generics.ListAPIView):
             wallet.balance -= cost
             wallet.save(update_fields=['balance'])
             log_wallet_transaction(request.user, -cost, f'Campaign: {data["message"][:40]}')
+        check_low_balance(request.user, notify=True)
 
+        scheduled_at = data.get('scheduled_at')
         campaign = Campaign.objects.create(
             user=request.user,
             provider=provider,
@@ -217,8 +220,14 @@ class CampaignListCreateView(generics.ListAPIView):
             unit_provider_cost=Decimal(segments) * platform_rate.cost_for(data['channel']),
             total_recipients=recipient_count,
             total_cost=cost,
-            status='PROCESSING',
+            status='SCHEDULED' if scheduled_at else 'PROCESSING',
+            scheduled_at=scheduled_at,
         )
+
+        if scheduled_at:
+            # Funds are already reserved above. Nothing is sent now — the
+            # cron tick (ProcessQueuedCampaignsView) starts it at scheduled_at.
+            return Response(CampaignSerializer(campaign).data, status=status.HTTP_201_CREATED)
 
         if recipient_count > ASYNC_SEND_THRESHOLD:
             # Too big to safely finish inside one request — leave it
@@ -361,6 +370,7 @@ def _finalize_campaign(campaign: Campaign) -> None:
             log_wallet_transaction(
                 campaign.user, refund, f'Refund: {unsent_count} of {campaign.total_recipients} recipients not sent'
             )
+        check_low_balance(campaign.user)
 
     if not sent_count:
         campaign.status = 'FAILED'
@@ -476,6 +486,29 @@ class RateView(APIView):
         return Response(PlatformRateSerializer(PlatformRate.current()).data)
 
 
+class CampaignCancelView(APIView):
+    """Cancels a SCHEDULED campaign and refunds the funds reserved when it
+    was scheduled. Only works while it is still SCHEDULED — once the cron
+    tick has released it, it's sending and can't be recalled."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        campaign = get_object_or_404(Campaign, pk=pk, user=request.user, is_admin_campaign=False)
+        with transaction.atomic():
+            # Same conditional hand-off as the cron release.
+            if not Campaign.objects.filter(pk=campaign.pk, status='SCHEDULED').update(status='CANCELLED', recipients=[], total_cost=Decimal('0.00')):
+                return Response({'detail': 'This campaign has already started or was cancelled.'}, status=status.HTTP_400_BAD_REQUEST)
+            refund = Decimal(campaign.total_recipients) * campaign.unit_cost
+            wallet = Wallet.objects.select_for_update().get(user=request.user)
+            wallet.balance += refund
+            wallet.save(update_fields=['balance'])
+            log_wallet_transaction(request.user, refund, f'Refund: scheduled campaign #{campaign.pk} cancelled')
+        check_low_balance(request.user)
+        campaign.refresh_from_db()
+        return Response(CampaignSerializer(campaign).data)
+
+
 class ProcessQueuedCampaignsView(APIView):
     """Advances every campaign still PROCESSING (see ASYNC_SEND_THRESHOLD
     on CampaignListCreateView.post()) by up to MAX_CHUNKS_PER_BATCH
@@ -503,6 +536,12 @@ class ProcessQueuedCampaignsView(APIView):
         # Bounded so one slow campaign can't starve every other queued
         # campaign of a turn this tick — oldest first, so a big campaign
         # doesn't get stuck behind newer ones indefinitely either.
+        # First, release scheduled campaigns that have come due. The
+        # conditional update is the hand-off: if the customer cancels at
+        # the same moment, exactly one of the two wins.
+        due_ids = list(Campaign.objects.filter(status='SCHEDULED', scheduled_at__lte=timezone.now()).values_list('id', flat=True))
+        released = sum(Campaign.objects.filter(id=cid, status='SCHEDULED').update(status='PROCESSING') for cid in due_ids)
+
         campaigns = Campaign.objects.filter(status='PROCESSING').order_by('created_at')[:5]
         progress = []
         for campaign in campaigns:
@@ -515,7 +554,7 @@ class ProcessQueuedCampaignsView(APIView):
                 'sent_so_far': campaign.next_recipient_index,
                 'total_recipients': campaign.total_recipients,
             })
-        return Response({'processed': progress})
+        return Response({'released': released, 'processed': progress})
 
 
 # --- Admin --------------------------------------------------------------------
@@ -655,6 +694,7 @@ class AdminWalletAdjustView(APIView):
             wallet.balance += signed
             wallet.save(update_fields=['balance'])
             log_wallet_transaction(target_user, signed, reason)
+        check_low_balance(target_user)
         return Response({'balance': str(wallet.balance)})
 
 

@@ -12,6 +12,7 @@ from .views import (
     AdminStatsView,
     AdminUserSpendListView,
     AdminWalletAdjustView,
+    CampaignCancelView,
     CampaignDetailView,
     CampaignListCreateView,
     CampaignRetryView,
@@ -26,6 +27,7 @@ urlpatterns = [
     path('sender-ids/', SenderIDListCreateView.as_view(), name='sender-id-list'),
     path('campaigns/', CampaignListCreateView.as_view(), name='campaign-list'),
     path('campaigns/<int:pk>/', CampaignDetailView.as_view(), name='campaign-detail'),
+    path('campaigns/<int:pk>/cancel/', CampaignCancelView.as_view(), name='campaign-cancel'),
     path('campaigns/<int:campaign_id>/retry/', CampaignRetryView.as_view(), name='campaign-retry'),
     # Called by an external scheduler, not a browser — see
     # ProcessQueuedCampaignsView's docstring.
