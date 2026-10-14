@@ -15,8 +15,12 @@ from apps.campaigns.models import Campaign
 from .forms import EmailLoginForm, SignupForm
 from .utils import check_verification_code, claim_welcome_bonus, resend_wait_seconds, send_verification_code
 from .web_utils import customer_required
+import logging
+
 from django.conf import settings
 from django.views.decorators.http import require_POST
+
+logger = logging.getLogger(__name__)
 
 
 def login_view(request):
@@ -42,6 +46,7 @@ def signup_view(request):
             try:
                 send_verification_code(user)
             except Exception:
+                logger.exception('Verification email failed at signup (%s)', user.email)
                 messages.error(request, "We couldn't send your code just now — tap Resend on the next page.")
             return redirect('web-verify-email')
         return redirect('web-dashboard')
@@ -106,5 +111,6 @@ def resend_code_view(request):
             send_verification_code(request.user)
             messages.success(request, f'A new code was sent to {request.user.email}.')
         except Exception:
+            logger.exception('Verification email failed on resend (%s)', request.user.email)
             messages.error(request, "We couldn't send the code right now. Please try again shortly.")
     return redirect('web-verify-email')
