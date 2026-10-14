@@ -14,12 +14,12 @@ from django.shortcuts import render
 from django.views.decorators.http import require_POST
 
 from apps.accounts.models import WalletTransaction
-from apps.accounts.web_utils import call_api, error_text
+from apps.accounts.web_utils import call_api, customer_required, error_text
 
 from .views import PaymentVerifyView
 
 
-@login_required(login_url='web-login')
+@customer_required
 def wallet_view(request):
     page = Paginator(WalletTransaction.objects.filter(user=request.user), 20).get_page(request.GET.get('page'))
     return render(request, 'payments/wallet.html', {
@@ -34,7 +34,7 @@ def wallet_view(request):
     })
 
 
-@login_required(login_url='web-login')
+@customer_required
 @require_POST
 def wallet_verify(request):
     body = json.loads(request.body or '{}')

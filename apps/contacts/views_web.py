@@ -8,7 +8,7 @@ from django.core.paginator import Paginator
 from django.db import models
 from django.shortcuts import get_object_or_404, redirect, render
 
-from apps.accounts.web_utils import staff_required
+from apps.accounts.web_utils import customer_required, staff_required
 
 from .models import Contact, ContactGroup
 from .views import import_contacts_csv
@@ -36,7 +36,7 @@ SCOPES = {
 def scoped(view):
     """Applies the right auth decorator for the URL's scope."""
     def wrapper(request, scope, *args, **kwargs):
-        guard = staff_required if scope == 'console' else login_required(login_url='web-login')
+        guard = staff_required if scope == 'console' else customer_required
         return guard(view)(request, scope, *args, **kwargs)
     wrapper.__name__ = view.__name__
     return wrapper

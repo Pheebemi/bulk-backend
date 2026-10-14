@@ -36,6 +36,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
     full_name = models.CharField(max_length=150, blank=True)
     phone_number = models.CharField(max_length=15, unique=True, blank=True, null=True)
+    email_verified = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(auto_now_add=True)
@@ -77,3 +78,17 @@ class WalletTransaction(models.Model):
 
     def __str__(self):
         return f'{self.user.email}: {self.amount} — {self.description}'
+
+
+class EmailOTP(models.Model):
+    """The current signup/verification code for a user. Only a hash is
+    stored; one live code per user, replaced on resend."""
+
+    VALIDITY_MINUTES = 10
+    MAX_ATTEMPTS = 5
+    RESEND_COOLDOWN_SECONDS = 60
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='email_otp')
+    code_hash = models.CharField(max_length=128)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now=True)

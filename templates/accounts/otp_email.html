@@ -1,0 +1,6 @@
+<div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#0f1a2b">
+  <div style="font-size:20px;font-weight:800;color:#1f6feb;margin-bottom:16px">Reachly</div>
+  <p style="font-size:15px;line-height:1.5">Hi{% if user.full_name %} {{ user.full_name }}{% endif %}, use this code to verify your email address:</p>
+  <div style="font-size:34px;font-weight:800;letter-spacing:8px;background:#e7f0ff;color:#1f6feb;text-align:center;padding:18px;border-radius:12px;margin:18px 0">{{ code }}</div>
+  <p style="font-size:13px;color:#5b6b82;line-height:1.5">This code expires in {{ validity_minutes }} minutes. If you didn't create a Reachly account, you can ignore this email.</p>
+</div>

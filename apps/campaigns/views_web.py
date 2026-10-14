@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
 
-from apps.accounts.web_utils import call_api, error_text
+from apps.accounts.web_utils import call_api, customer_required, error_text
 from apps.contacts.models import ContactGroup
 
 from .models import Campaign, PlatformRate, SenderID
@@ -18,14 +18,14 @@ from .views import (
 )
 
 
-@login_required(login_url='web-login')
+@customer_required
 def campaign_list(request):
     qs = Campaign.objects.filter(user=request.user, is_admin_campaign=False).order_by('-created_at')
     page = Paginator(qs, 25).get_page(request.GET.get('page'))
     return render(request, 'campaigns/list.html', {'page': page})
 
 
-@login_required(login_url='web-login')
+@customer_required
 def campaign_new(request):
     if request.method == 'POST':
         manual = [n.strip() for n in request.POST.get('manual_numbers', '').replace('\n', ',').split(',') if n.strip()]
@@ -61,14 +61,14 @@ def campaign_new(request):
     })
 
 
-@login_required(login_url='web-login')
+@customer_required
 def campaign_detail(request, pk):
     campaign = get_object_or_404(Campaign, pk=pk, user=request.user)
     _refresh_campaign_from_termii(campaign)
     return render(request, 'campaigns/detail.html', {'campaign': campaign, 'logs': campaign.logs.all()[:200]})
 
 
-@login_required(login_url='web-login')
+@customer_required
 def sender_ids(request):
     if request.method == 'POST':
         status, data = call_api(SenderIDListCreateView, request.user, 'post', {

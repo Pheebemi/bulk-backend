@@ -38,3 +38,21 @@ def staff_required(view):
         return view(request, *args, **kwargs)
 
     return wrapper
+
+
+def customer_required(view):
+    """Customer pages: logged in, and (once email is configured) verified."""
+    from functools import wraps
+
+    from django.conf import settings
+    from django.shortcuts import redirect
+
+    @wraps(view)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect('web-login')
+        if settings.EMAIL_VERIFICATION_REQUIRED and not request.user.email_verified and not request.user.is_staff:
+            return redirect('web-verify-email')
+        return view(request, *args, **kwargs)
+
+    return wrapper
