@@ -1,3 +1,4 @@
+import logging
 import secrets
 from datetime import timedelta
 from decimal import Decimal
@@ -10,6 +11,8 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 
 from .models import EmailOTP, Wallet, WalletTransaction
+
+logger = logging.getLogger(__name__)
 
 
 def log_wallet_transaction(user, amount: Decimal, description: str) -> None:
@@ -37,6 +40,20 @@ def claim_welcome_bonus(user) -> bool:
         wallet.save(update_fields=['balance', 'welcome_bonus_claimed'])
         log_wallet_transaction(user, bonus, 'Welcome bonus')
     return True
+
+
+def send_html_email(subject: str, template: str, context: dict, to: list) -> None:
+    """Best-effort HTML email: a mail failure must never break the request
+    that triggered it, so errors are logged and swallowed."""
+    try:
+        message = EmailMessage(
+            subject=subject, body=render_to_string(template, context),
+            from_email=settings.DEFAULT_FROM_EMAIL, to=to,
+        )
+        message.content_subtype = 'html'
+        message.send(fail_silently=False)
+    except Exception:
+        logger.exception('Email failed (%s -> %s)', subject, to)
 
 
 def send_verification_code(user) -> None:
