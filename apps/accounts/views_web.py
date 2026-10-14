@@ -28,7 +28,21 @@ def login_view(request):
         return redirect('web-dashboard')
     form = EmailLoginForm(request.POST or None, request=request)
     if request.method == 'POST' and form.is_valid():
-        auth_login(request, form.cleaned_data['user'])
+        user = form.cleaned_data['user']
+        auth_login(request, user)
+        if settings.EMAIL_VERIFICATION_REQUIRED and not user.email_verified and not user.is_staff:
+            # Unverified: send a fresh code (unless one went out in the last
+            # minute) and take them straight to the code entry page.
+            if resend_wait_seconds(user) == 0:
+                try:
+                    send_verification_code(user)
+                    messages.info(request, f'Verify your email to continue — we sent a new code to {user.email}.')
+                except Exception:
+                    logger.exception('Verification email failed at login (%s)', user.email)
+                    messages.error(request, "We couldn't send your code just now — tap Resend below.")
+            else:
+                messages.info(request, 'Verify your email to continue — enter the code we just sent.')
+            return redirect('web-verify-email')
         messages.success(request, 'Welcome back.')
         return redirect('web-dashboard')
     return render(request, 'accounts/login.html', {'form': form})
