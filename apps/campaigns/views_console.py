@@ -4,6 +4,7 @@ views (call_api) so validation and side effects stay in one place."""
 
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model, login as auth_login, logout as auth_logout
 from django.core.paginator import Paginator
@@ -171,7 +172,7 @@ def approvals(request):
             payload = {
                 'name': request.POST.get('name', '').upper(),
                 'visibility': request.POST.get('visibility', 'shared'),
-                'provider': request.POST.get('provider', 'termii'),
+                'provider': settings.SMS_PROVIDER,
                 'platform_status': request.POST.get('platform_status', 'active'),
             }
             if request.POST.get('user_email'):
@@ -180,7 +181,6 @@ def approvals(request):
             messages.success(request, 'Sender ID created.') if status < 300 else messages.error(request, error_text(data))
         elif action == 'update':
             status, data = call_api(AdminSenderIDDetailView, request.user, 'patch', {
-                'provider': request.POST.get('provider'),
                 'platform_status': request.POST.get('platform_status'),
                 'visibility': request.POST.get('visibility'),
             }, pk=request.POST.get('id'))

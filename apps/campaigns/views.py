@@ -122,6 +122,8 @@ def _sync_sender_id_statuses(queryset):
     active/blocked — there's nothing left that could still change, so
     there's no reason to make a page load depend on Termii's API being
     up and fast."""
+    if settings.SMS_PROVIDER != 'termii':
+        return  # Termii's status API only matters while Termii is the live provider
     rows = [s for s in queryset if s.provider == 'termii']
     if not any(s.platform_status == 'pending' for s in rows):
         return
@@ -181,7 +183,7 @@ class CampaignListCreateView(generics.ListAPIView):
                 {'detail': f'"{sender_id}" is not an approved sender ID on your account.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        provider = matched_sender_id.provider
+        provider = settings.SMS_PROVIDER
 
         segments = count_segments(data['message'])
         rate = PlatformRate.current().rate_for(data['channel'])
@@ -706,7 +708,7 @@ class AdminCampaignListCreateView(generics.ListAPIView):
         # every provider approval goes through AdminSenderIDDetailView,
         # but matches this view's prior behavior rather than hard-failing).
         matched_sender_id = SenderID.objects.filter(name=sender_id, platform_status='active').first()
-        provider = matched_sender_id.provider if matched_sender_id else 'termii'
+        provider = settings.SMS_PROVIDER
 
         segments = count_segments(data['message'])
         # Reference cost only — admin sends aren't charged to any wallet.

@@ -155,3 +155,8 @@ CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='https://*.vercel.
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 LOGIN_URL = 'web-login'
+
+# The single SMS provider every new send goes through, regardless of the
+# provider recorded on a Sender ID row. Termii and Sendchamp are no longer
+# used; their client code stays so this can be flipped back by env var.
+SMS_PROVIDER = config('SMS_PROVIDER', default='kudisms')

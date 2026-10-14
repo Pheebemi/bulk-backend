@@ -2,14 +2,13 @@
 {% block title %}Sender IDs — Reachly Admin{% endblock %}
 {% block page_content %}
 <h1 class="mb-1 text-2xl font-extrabold text-ink">Sender IDs</h1>
-<p class="mb-6 max-w-2xl text-sm text-muted">Submit a customer's request on the provider's own dashboard, then record the outcome here. Shared names are usable by every customer; admin-only ones only from the console.</p>
+<p class="mb-6 max-w-2xl text-sm text-muted">Submit a customer's request on KudiSMS, then record the outcome here. Shared names are usable by every customer; admin-only ones only from the console.</p>
 <details class="card mb-6 max-w-3xl p-4">
   <summary class="cursor-pointer text-sm font-bold text-purple-600">+ Add a Sender ID</summary>
   <form method="post" class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
     {% csrf_token %}<input type="hidden" name="action" value="create">
     <input type="text" name="name" maxlength="11" placeholder="NAME" required class="!mt-0">
     <select name="visibility" class="!mt-0">{% for v, l in visibilities %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select>
-    <select name="provider" class="!mt-0">{% for v, l in providers %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select>
     <select name="platform_status" class="!mt-0">{% for v, l in statuses %}<option value="{{ v }}" {% if v == 'active' %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
     <input type="email" name="user_email" placeholder="Owner email (private only)" class="!mt-0 sm:col-span-2">
     <button type="submit" class="rounded-lg bg-purple-600 py-2.5 text-sm font-bold text-white sm:col-span-2">Create</button>
@@ -29,7 +28,6 @@
     <select name="visibility" class="!mt-0 !px-2 !py-1.5 !text-xs">{% for v, l in visibilities %}<option value="{{ v }}" {% if s.visibility == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
     <select name="platform_status" class="!mt-0 !px-2 !py-1.5 !text-xs">{% for v, l in statuses %}<option value="{{ v }}" {% if s.platform_status == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
     <span class="flex flex-wrap items-center gap-2">
-      <select name="provider" class="!mt-0 !w-auto !px-2 !py-1.5 !text-xs">{% for v, l in providers %}<option value="{{ v }}" {% if s.provider == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
       <button name="action" value="update" class="rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-bold text-white">Save</button>
       <button name="action" value="delete" onclick="return confirm('Delete this Sender ID?')" class="text-xs font-bold text-danger">Delete</button>
     </span>

@@ -43,7 +43,7 @@ class SenderID(models.Model):
     # codebase; only Termii's status *sync* is (see
     # _sync_sender_id_statuses), for a provider='termii' row Admin
     # submitted manually.
-    provider = models.CharField(max_length=10, choices=PROVIDER_CHOICES, default='termii')
+    provider = models.CharField(max_length=10, choices=PROVIDER_CHOICES, default='kudisms')
     # For a termii-provider row: synced from Termii's GET /api/sender-id
     # (active/pending/blocked) — Termii's own team approves this, not our
     # Admin. See PROJECT_SPEC.md §4. For sendchamp/kudisms, there's no
