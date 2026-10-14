@@ -47,7 +47,7 @@ def send_verification_code(user) -> None:
     body = render_to_string('accounts/otp_email.html', {
         'user': user, 'code': code, 'validity_minutes': EmailOTP.VALIDITY_MINUTES,
     })
-    message = EmailMessage(subject='Your Reachly verification code', body=body, from_email=settings.DEFAULT_FROM_EMAIL, to=[user.email])
+    message = EmailMessage(subject='Your ReachlySMS verification code', body=body, from_email=settings.DEFAULT_FROM_EMAIL, to=[user.email])
     message.content_subtype = 'html'
     message.send(fail_silently=False)
 

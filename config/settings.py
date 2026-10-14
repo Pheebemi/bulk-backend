@@ -178,7 +178,7 @@ EMAIL_BACKEND = config(
     'EMAIL_BACKEND',
     default='django.core.mail.backends.smtp.EmailBackend' if EMAIL_HOST_USER else 'django.core.mail.backends.console.EmailBackend',
 )
-DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default=f'Reachly <{EMAIL_HOST_USER or "reachly@pheedev.online"}>')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default=f'ReachlySMS <{EMAIL_HOST_USER or "reachly@pheedev.online"}>')
 EMAIL_VERIFICATION_REQUIRED = config('EMAIL_VERIFICATION_REQUIRED', default=bool(EMAIL_HOST_USER), cast=bool)
 
 # Public base URL used for links in emails.

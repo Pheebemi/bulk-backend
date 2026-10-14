@@ -55,7 +55,7 @@ def signup_view(request):
     if request.method == 'POST' and form.is_valid():
         user = form.save()
         auth_login(request, user)
-        messages.success(request, f'Welcome to Reachly, {user.full_name or "there"}.')
+        messages.success(request, f'Welcome to ReachlySMS, {user.full_name or "there"}.')
         if settings.EMAIL_VERIFICATION_REQUIRED:
             try:
                 send_verification_code(user)

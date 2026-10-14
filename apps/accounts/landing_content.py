@@ -24,7 +24,7 @@ FEATURES = [
         'name': 'Contact groups',
         'image': 'illustrations/contacts.svg',
         'title': 'Your contact list stays in your database',
-        'body': 'Upload a CSV or add numbers by hand. Contacts are stored on Reachly and handed to the network only as the recipient list of a send — never copied into a third-party phonebook you cannot clear.',
+        'body': 'Upload a CSV or add numbers by hand. Contacts are stored on ReachlySMS and handed to the network only as the recipient list of a send — never copied into a third-party phonebook you cannot clear.',
         'points': ['CSV import with first name, last name and number', 'Unlimited groups per account', 'Remove a contact and it is gone for good'],
     },
     {

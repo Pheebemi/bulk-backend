@@ -1,11 +1,11 @@
 {% extends "layout/base.html" %}
-{% block title %}Admin login — Reachly{% endblock %}
+{% block title %}Admin login — ReachlySMS{% endblock %}
 {% block content %}
 <div class="flex min-h-screen items-center justify-center bg-sidebar px-4">
   <div class="w-full max-w-[380px] rounded-2xl bg-surface p-6 sm:p-9">
     <div class="mb-7 flex items-center gap-2.5">
-      <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-600"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H7l-3 3V4z"/></svg></div>
-      <span class="text-xl font-extrabold text-ink">Reachly Admin</span>
+      {% include "includes/logo.html" with cls="h-9" %}
+      <span class="rounded-md bg-purple-600/15 px-2 py-0.5 text-xs font-bold text-purple-600">Admin</span>
     </div>
     <h1 class="mb-1 text-xl font-extrabold text-ink">Admin console</h1>
     <p class="mb-6 text-sm text-muted">Restricted to platform staff.</p>

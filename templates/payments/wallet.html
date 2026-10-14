@@ -1,5 +1,5 @@
 {% extends "layout/user_shell.html" %}
-{% block title %}Wallet — Reachly{% endblock %}
+{% block title %}Wallet — ReachlySMS{% endblock %}
 {% block page_content %}
 <h1 class="mb-6 text-2xl font-extrabold text-ink">Fund wallet</h1>
 <div class="grid max-w-3xl grid-cols-1 gap-6 lg:grid-cols-[1.2fr_1fr]">
@@ -50,7 +50,7 @@
       currency: 'NGN',
       payment_options: 'card,ussd,banktransfer',
       customer: { email: cfg.email, phone_number: cfg.phone, name: cfg.name },
-      customizations: { title: 'Reachly wallet funding', description: 'Fund your Reachly SMS wallet' },
+      customizations: { title: 'ReachlySMS wallet funding', description: 'Fund your ReachlySMS SMS wallet' },
       callback: function (r) {
         if (r.status !== 'successful' && r.status !== 'completed') { show('Payment was not completed.', false); return; }
         fetch('{% url "web-wallet-verify" %}', {
