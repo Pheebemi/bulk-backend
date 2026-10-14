@@ -47,3 +47,10 @@ def nav(request):
             'active': request.path == url or request.path.startswith(url),
         })
     return {'nav_items': items}
+
+
+def asset_version(request):
+    """Cache-buster for the compiled CSS so a deploy's new styles are never
+    paired with a browser's stale copy."""
+    import os
+    return {'asset_version': (os.environ.get('VERCEL_GIT_COMMIT_SHA') or 'dev')[:8]}

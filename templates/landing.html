@@ -12,7 +12,7 @@
 <header class="sticky top-0 z-40 border-b border-border/70 glass">
   <div class="mx-auto flex max-w-6xl items-center justify-between px-5 py-3.5">
     <a href="/" class="flex items-center gap-2.5">
-      {% include "includes/logo.html" with cls="h-10" %}
+      {% include "includes/logo.html" with h=40 %}
     </a>
     <nav class="hidden items-center gap-1 text-sm font-semibold text-muted md:flex">
       <a href="#how" class="rounded-lg px-3.5 py-2 transition hover:bg-surface2 hover:text-ink">How it works</a>
@@ -197,7 +197,7 @@
 </div></section>
 
 <footer class="border-t border-border bg-bg py-10"><div class="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 text-sm text-muted sm:flex-row">
-  <div class="flex items-center gap-2.5">{% include "includes/logo.html" with cls="h-8" %}</div>
+  <div class="flex items-center gap-2.5">{% include "includes/logo.html" with h=32 %}</div>
   <div class="flex flex-wrap justify-center gap-6 font-semibold"><a href="#how" class="hover:text-ink">How it works</a><a href="#pricing" class="hover:text-ink">Pricing</a><a href="#faq" class="hover:text-ink">FAQ</a><a href="{% url 'web-login' %}" class="hover:text-ink">Log in</a></div>
   <div>© {% now "Y" %} ReachlySMS</div>
 </div></footer>
