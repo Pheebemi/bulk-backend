@@ -160,3 +160,6 @@ LOGIN_URL = 'web-login'
 # provider recorded on a Sender ID row. Termii and Sendchamp are no longer
 # used; their client code stays so this can be flipped back by env var.
 SMS_PROVIDER = config('SMS_PROVIDER', default='kudisms')
+
+# Free credit every new customer starts with (₦). Set to 0 to turn it off.
+SIGNUP_BONUS_NGN = config('SIGNUP_BONUS_NGN', default=10, cast=int)

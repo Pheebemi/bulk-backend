@@ -2,7 +2,8 @@ from django.db.models import Sum
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import User, Wallet, WalletTransaction
+from .models import User, WalletTransaction
+from .utils import create_wallet_with_bonus
 
 
 class SignupSerializer(serializers.ModelSerializer):
@@ -15,7 +16,7 @@ class SignupSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         password = validated_data.pop('password')
         user = User.objects.create_user(password=password, **validated_data)
-        Wallet.objects.create(user=user)
+        create_wallet_with_bonus(user)
         return user
 
 
