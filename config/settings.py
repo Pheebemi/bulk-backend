@@ -8,7 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config('DJANGO_SECRET_KEY', default='dev-only-insecure-key-change-me')
 DEBUG = config('DEBUG', default=False, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,.vercel.app', cast=Csv())
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,.vercel.app,reachly.pheedev.online', cast=Csv())
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -151,7 +151,7 @@ CRON_SECRET = config('CRON_SECRET', default='')
 # Without this Django sees plain http, and its CSRF Origin check (the
 # browser sends an https Origin) would reject every login/form POST.
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='https://*.vercel.app', cast=Csv())
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='https://*.vercel.app,https://reachly.pheedev.online', cast=Csv())
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 LOGIN_URL = 'web-login'
