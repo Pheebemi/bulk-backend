@@ -99,7 +99,7 @@
       <h3 class="text-lg font-extrabold text-ink">{{ title }}</h3>
       <p class="mt-2 text-sm leading-relaxed text-muted">{{ body }}</p>
       {% if forloop.counter0 == 0 %}<img src="{% static 'illustrations/sending-message.svg' %}" alt="" class="mt-4 hidden max-h-44 w-full object-contain md:block" loading="lazy" onerror="this.remove()">{% endif %}
-      {% if forloop.counter0 == 1 %}<img src="{% static 'illustrations/otp.svg' %}" alt="" class="mt-4 hidden max-h-44 w-full object-contain md:block" loading="lazy" onerror="this.remove()">{% endif %}
+      {% if forloop.counter0 == 1 %}<img src="{% static 'illustrations/reports.svg' %}" alt="" class="mt-4 hidden max-h-44 w-full object-contain md:block" loading="lazy" onerror="this.remove()">{% endif %}
     </div>
     {% endfor %}
   </div>
@@ -152,8 +152,8 @@
       <div class="h-full rounded-[1.4rem] bg-surface p-8">
         <div class="flex items-center justify-between"><div class="text-sm font-bold text-accent">DND route</div><span class="rounded-full bg-linear-to-r from-accent to-indigo-500 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white">Reaches everyone</span></div>
         <div class="mt-4 flex items-baseline gap-1"><span class="text-5xl font-extrabold tracking-tight text-ink">₦{{ dnd_rate|floatformat:"-2" }}</span><span class="text-sm font-semibold text-muted">/ segment</span></div>
-        <p class="mt-4 text-sm leading-relaxed text-muted">Delivers to numbers on the DND register, where standard traffic is blocked. Required for OTPs and time-critical alerts.</p>
-        <ul class="mt-6 flex flex-col gap-2.5 text-sm font-semibold text-ink"><li>✓ Reaches DND-registered numbers</li><li>✓ Ideal for OTP &amp; 2FA</li><li>✓ Same refunds on failure</li></ul>
+        <p class="mt-4 text-sm leading-relaxed text-muted">Delivers to numbers on the DND register, where standard traffic is blocked. Ideal for time-critical alerts.</p>
+        <ul class="mt-6 flex flex-col gap-2.5 text-sm font-semibold text-ink"><li>✓ Reaches DND-registered numbers</li><li>✓ Ideal for urgent alerts</li><li>✓ Same refunds on failure</li></ul>
       </div>
     </div>
   </div>

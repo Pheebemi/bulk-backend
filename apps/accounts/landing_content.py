@@ -3,7 +3,6 @@ Next.js app/page.tsx)."""
 
 USE_CASES = [  # (title, body, icon svg inner markup)
     ('Promotional SMS', 'Announce sales, drops and offers to a contact group in one send, with the cost shown before you confirm.', '<path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12"/>'),
-    ('OTP & 2FA', 'One-time codes over the DND route, so verification messages reach customers who have blocked marketing traffic.', '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'),
     ('Transactional alerts', 'Order confirmations, payment receipts and dispatch notices triggered from your own systems.', '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>'),
     ('Reminders', 'Appointment, renewal and repayment nudges scheduled against a saved contact group.', '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
     ('Service notifications', 'Downtime notices, delivery updates and account alerts sent to everyone at once.', '<path d="M4 4h16v12H7l-3 3z"/>'),
@@ -11,7 +10,7 @@ USE_CASES = [  # (title, body, icon svg inner markup)
 ]
 
 INDUSTRIES = [
-    ('Financial services', 'OTPs, balance alerts and repayment reminders on the DND route, where delivery is not optional.'),
+    ('Financial services', 'Balance alerts, statements and repayment reminders on the DND route, where delivery is not optional.'),
     ('eCommerce', 'Order confirmations, dispatch notices and campaign blasts to your customer list.'),
     ('Schools & training', 'Fee reminders, results notifications and announcements to parents and students.'),
     ('Healthcare', 'Appointment reminders and follow-up messages that cut no-shows.'),
