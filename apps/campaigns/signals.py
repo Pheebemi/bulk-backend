@@ -53,3 +53,9 @@ def notify_sender_id_change(sender, instance, created, **kwargs):
             {'sender': instance, 'user': user, 'site_url': settings.SITE_URL},
             [user.email],
         )
+    elif not created and instance.platform_status == 'blocked' and getattr(instance, '_previous_status', None) != 'blocked':
+        _send(
+            f'Your sender ID {instance.name} was not approved', 'campaigns/email_sender_rejected.html',
+            {'sender': instance, 'user': user, 'site_url': settings.SITE_URL},
+            [user.email],
+        )

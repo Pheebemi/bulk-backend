@@ -53,6 +53,8 @@ class SenderID(models.Model):
     # DND whitelisting is a separate, manual step (Termii support) — not
     # covered by the Sender ID API at all. Admin flips this once confirmed.
     termii_dnd_whitelisted = models.BooleanField(default=False)
+    # Why Admin blocked/declined the request; emailed to the customer.
+    rejection_reason = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

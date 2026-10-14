@@ -26,7 +26,10 @@
     <span class="font-bold">{{ s.name }}</span>
     <span class="text-xs text-muted">{{ s.user.email|default:"—" }}{% if s.use_case %}<br>{{ s.use_case|truncatechars:60 }}{% endif %}</span>
     <select name="visibility" class="!mt-0 !px-2 !py-1.5 !text-xs">{% for v, l in visibilities %}<option value="{{ v }}" {% if s.visibility == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
-    <select name="platform_status" class="!mt-0 !px-2 !py-1.5 !text-xs">{% for v, l in statuses %}<option value="{{ v }}" {% if s.platform_status == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+    <span class="flex flex-col gap-1">
+      <select name="platform_status" class="!mt-0 !px-2 !py-1.5 !text-xs">{% for v, l in statuses %}<option value="{{ v }}" {% if s.platform_status == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+      {% if s.visibility == 'private' %}<input name="rejection_reason" value="{{ s.rejection_reason }}" placeholder="Reason if blocked" class="!mt-0 !px-2 !py-1.5 !text-xs">{% endif %}
+    </span>
     <span class="flex flex-wrap items-center gap-2">
       <button name="action" value="update" class="rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-bold text-white">Save</button>
       <button name="action" value="delete" onclick="return confirm('Delete this Sender ID?')" class="text-xs font-bold text-danger">Delete</button>

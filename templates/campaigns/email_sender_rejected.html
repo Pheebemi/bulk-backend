@@ -1,0 +1,8 @@
+<div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#0f1a2b">
+  <div style="font-size:20px;font-weight:800;color:#1f6feb;margin-bottom:16px">Reachly</div>
+  <p style="font-size:15px;line-height:1.5">Hi{% if user.full_name %} {{ user.full_name }}{% endif %}, unfortunately your sender ID request wasn't approved:</p>
+  <div style="font-size:28px;font-weight:800;letter-spacing:3px;background:#fdecec;color:#c62828;text-align:center;padding:16px;border-radius:12px;margin:16px 0">{{ sender.name }}</div>
+  <p style="font-size:14px;line-height:1.5"><strong>Reason:</strong><br>{{ sender.rejection_reason|linebreaksbr|default:"It didn't meet our requirements." }}</p>
+  <p style="font-size:14px;line-height:1.5;color:#5b6b82">You can submit a new request with a different name or a clearer use case.</p>
+  <p style="margin-top:20px"><a href="{{ site_url }}/sender-ids/" style="background:#1f6feb;color:#fff;text-decoration:none;padding:10px 18px;border-radius:10px;font-weight:700;font-size:14px">Request another</a></p>
+</div>

@@ -11,7 +11,7 @@ class SenderIDSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SenderID
-        fields = ['id', 'name', 'provider', 'platform_status', 'termii_dnd_whitelisted', 'created_at', 'is_shared']
+        fields = ['id', 'name', 'provider', 'platform_status', 'rejection_reason', 'termii_dnd_whitelisted', 'created_at', 'is_shared']
         read_only_fields = fields
         # use_case and visibility are deliberately excluded — use_case is
         # what Admin reads to decide what to submit on a provider's
@@ -46,7 +46,7 @@ class AdminSenderIDSerializer(serializers.ModelSerializer):
         model = SenderID
         fields = [
             'id', 'name', 'visibility', 'use_case', 'provider', 'platform_status',
-            'termii_dnd_whitelisted', 'created_at', 'user_email', 'is_shared', 'is_admin_only',
+            'rejection_reason', 'termii_dnd_whitelisted', 'created_at', 'user_email', 'is_shared', 'is_admin_only',
         ]
         read_only_fields = ['created_at', 'is_shared', 'is_admin_only']
         # DRF auto-derives validators from the model's UniqueConstraints,

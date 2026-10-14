@@ -183,6 +183,7 @@ def approvals(request):
             status, data = call_api(AdminSenderIDDetailView, request.user, 'patch', {
                 'platform_status': request.POST.get('platform_status'),
                 'visibility': request.POST.get('visibility'),
+                'rejection_reason': request.POST.get('rejection_reason', '').strip(),
             }, pk=request.POST.get('id'))
             messages.success(request, 'Sender ID updated.') if status < 300 else messages.error(request, error_text(data))
         elif action == 'delete':
