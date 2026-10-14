@@ -52,6 +52,9 @@ class User(AbstractBaseUser, PermissionsMixin):
 class Wallet(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='wallet')
     balance = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    # New wallets start unclaimed; the customer taps "Claim" to receive the
+    # welcome bonus once (see utils.claim_welcome_bonus).
+    welcome_bonus_claimed = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):

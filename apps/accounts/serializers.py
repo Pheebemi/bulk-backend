@@ -3,7 +3,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from .models import User, WalletTransaction
-from .utils import create_wallet_with_bonus
+from .utils import create_wallet
 
 
 class SignupSerializer(serializers.ModelSerializer):
@@ -16,7 +16,7 @@ class SignupSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         password = validated_data.pop('password')
         user = User.objects.create_user(password=password, **validated_data)
-        create_wallet_with_bonus(user)
+        create_wallet(user)
         return user
 
 

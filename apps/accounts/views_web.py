@@ -13,6 +13,9 @@ from django.shortcuts import redirect, render
 from apps.campaigns.models import Campaign
 
 from .forms import EmailLoginForm, SignupForm
+from .utils import claim_welcome_bonus
+from django.conf import settings
+from django.views.decorators.http import require_POST
 
 
 def login_view(request):
@@ -55,5 +58,17 @@ def dashboard_view(request):
         'campaigns_sent': user_campaigns.count(),
         'recipients_reached': recipients_reached,
         'recent_campaigns': recent,
+        'bonus_amount': settings.SIGNUP_BONUS_NGN,
+        'can_claim_bonus': settings.SIGNUP_BONUS_NGN > 0 and not request.user.wallet.welcome_bonus_claimed,
     }
     return render(request, 'accounts/dashboard.html', context)
+
+
+@login_required(login_url='web-login')
+@require_POST
+def claim_bonus_view(request):
+    if claim_welcome_bonus(request.user):
+        messages.success(request, f'₦{settings.SIGNUP_BONUS_NGN} welcome bonus added to your wallet.')
+    else:
+        messages.info(request, 'Your welcome bonus has already been claimed.')
+    return redirect('web-dashboard')

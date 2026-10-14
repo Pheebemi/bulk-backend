@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth import authenticate
 
 from .models import User
-from .utils import create_wallet_with_bonus
+from .utils import create_wallet
 
 
 class EmailLoginForm(forms.Form):
@@ -43,5 +43,5 @@ class SignupForm(forms.ModelForm):
         user.set_password(self.cleaned_data['password'])
         if commit:
             user.save()
-            create_wallet_with_bonus(user)
+            create_wallet(user)
         return user
