@@ -186,7 +186,8 @@ class CampaignListCreateView(generics.ListAPIView):
         provider = settings.SMS_PROVIDER
 
         segments = count_segments(data['message'])
-        rate = PlatformRate.current().rate_for(data['channel'])
+        platform_rate = PlatformRate.current()
+        rate = platform_rate.rate_for(data['channel'])
         # Per-recipient price is kept separate so a partial send can be
         # refunded by the recipient, not all-or-nothing.
         unit_cost = Decimal(segments) * rate
@@ -213,6 +214,7 @@ class CampaignListCreateView(generics.ListAPIView):
             channel=data['channel'],
             recipients=recipients_numbers,
             unit_cost=unit_cost,
+            unit_provider_cost=Decimal(segments) * platform_rate.cost_for(data['channel']),
             total_recipients=recipient_count,
             total_cost=cost,
             status='PROCESSING',
@@ -367,8 +369,9 @@ def _finalize_campaign(campaign: Campaign) -> None:
     else:
         campaign.status = 'DELIVERED'
     campaign.total_cost = Decimal(sent_count) * campaign.unit_cost
+    campaign.termii_cost = Decimal(sent_count) * campaign.unit_provider_cost
     campaign.recipients = []
-    campaign.save(update_fields=['status', 'total_cost', 'recipients'])
+    campaign.save(update_fields=['status', 'total_cost', 'termii_cost', 'recipients'])
 
 
 def _extract_message_id(response: dict) -> str | None:

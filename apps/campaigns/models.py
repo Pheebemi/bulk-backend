@@ -77,6 +77,10 @@ class PlatformRate(models.Model):
 
     generic_rate = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal('8.00'))
     dnd_rate = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal('10.00'))
+    # What the SMS provider charges US per segment on each route — the
+    # profit report's cost side. Editable on the analytics page.
+    cost_generic = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal('6.95'))
+    cost_dnd = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal('5.95'))
     updated_at = models.DateTimeField(auto_now=True)
 
     @classmethod
@@ -86,6 +90,9 @@ class PlatformRate(models.Model):
 
     def rate_for(self, channel: str) -> Decimal:
         return self.dnd_rate if channel == 'dnd' else self.generic_rate
+
+    def cost_for(self, channel: str) -> Decimal:
+        return self.cost_dnd if channel == 'dnd' else self.cost_generic
 
     def __str__(self):
         return f'generic=₦{self.generic_rate} dnd=₦{self.dnd_rate}'
@@ -135,6 +142,10 @@ class Campaign(models.Model):
     # PlatformRate.current(), so a rate change while a large campaign is
     # still being processed across several batches can't skew the refund.
     unit_cost = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    # Same idea for what the provider charges us per recipient (segments x
+    # provider cost), snapshotted so the profit report doesn't shift when
+    # costs are edited later.
+    unit_provider_cost = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     total_recipients = models.PositiveIntegerField(default=0)
     delivered = models.PositiveIntegerField(default=0)
     failed = models.PositiveIntegerField(default=0)

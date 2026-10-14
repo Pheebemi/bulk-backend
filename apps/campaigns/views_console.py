@@ -9,11 +9,13 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model, login as auth_login, logout as auth_logout
 from django.core.paginator import Paginator
 from django.db.models import Count, Q, Sum, Value
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, TruncDate
+from django.utils import timezone
+from datetime import timedelta
 from django.shortcuts import get_object_or_404, redirect, render
 
 from apps.accounts.forms import EmailLoginForm
-from apps.accounts.models import Wallet
+from apps.accounts.models import Wallet, WalletTransaction
 from apps.accounts.web_utils import call_api, error_text, staff_required
 from apps.contacts.models import ContactGroup
 
@@ -61,8 +63,74 @@ def dashboard(request):
     })
 
 
+def _money(value):
+    return value or Decimal('0.00')
+
+
+def _profit_row(qs):
+    agg = qs.aggregate(revenue=Sum('total_cost'), cost=Sum('termii_cost'), sms=Sum('delivered'))
+    revenue, cost = _money(agg['revenue']), _money(agg['cost'])
+    profit = revenue - cost
+    return {
+        'revenue': revenue, 'cost': cost, 'profit': profit, 'sms': agg['sms'] or 0,
+        'margin': (profit / revenue * 100) if revenue else Decimal('0'),
+    }
+
+
+def _profit_report(rate):
+    """Customer revenue vs what the provider charged us, from customer
+    campaigns only (admin sends earn nothing). Failed sends have zero on
+    both sides, so they drop out naturally."""
+    base = Campaign.objects.filter(is_admin_campaign=False)
+    now = timezone.localtime()
+    start_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    periods = [
+        ('Today', base.filter(created_at__gte=start_today)),
+        ('Last 7 days', base.filter(created_at__gte=start_today - timedelta(days=6))),
+        ('Last 30 days', base.filter(created_at__gte=start_today - timedelta(days=29))),
+        ('All time', base),
+    ]
+    daily = (
+        base.filter(created_at__gte=start_today - timedelta(days=13))
+        .annotate(day=TruncDate('created_at'))
+        .values('day')
+        .annotate(revenue=Sum('total_cost'), cost=Sum('termii_cost'), sms=Sum('delivered'))
+        .order_by('-day')
+    )
+    daily_rows = []
+    for d in daily:
+        revenue, cost = _money(d['revenue']), _money(d['cost'])
+        daily_rows.append({'day': d['day'], 'sms': d['sms'] or 0, 'revenue': revenue, 'cost': cost, 'profit': revenue - cost})
+    bonuses = _money(WalletTransaction.objects.filter(description='Welcome bonus').aggregate(t=Sum('amount'))['t'])
+    all_time = _profit_row(base)
+    return {
+        'periods': [(label, _profit_row(qs)) for label, qs in periods],
+        'channels': [(label, _profit_row(base.filter(channel=ch))) for ch, label in (('generic', 'Generic'), ('dnd', 'DND'))],
+        'daily': daily_rows,
+        'bonuses': bonuses,
+        'net_after_bonuses': all_time['profit'] - bonuses,
+        'unit_margin_generic': rate.generic_rate - rate.cost_generic,
+        'unit_margin_dnd': rate.dnd_rate - rate.cost_dnd,
+    }
+
+
 @staff_required
 def analytics(request):
+    rate = PlatformRate.current()
+    if request.method == 'POST':
+        try:
+            cost_generic = Decimal(request.POST.get('cost_generic', ''))
+            cost_dnd = Decimal(request.POST.get('cost_dnd', ''))
+            if cost_generic < 0 or cost_dnd < 0:
+                raise ValueError
+        except (ArithmeticError, ValueError):
+            messages.error(request, 'Enter valid provider costs.')
+        else:
+            rate.cost_generic, rate.cost_dnd = cost_generic, cost_dnd
+            rate.save(update_fields=['cost_generic', 'cost_dnd', 'updated_at'])
+            messages.success(request, 'Provider costs updated. They apply to new sends.')
+        return redirect('console-analytics')
+
     admin_agg = Campaign.objects.filter(is_admin_campaign=True).aggregate(spend=Sum('termii_cost'), recipients=Sum('total_recipients'))
     user_agg = Campaign.objects.filter(is_admin_campaign=False).aggregate(spend=Sum('total_cost'), recipients=Sum('total_recipients'))
     admin_spend = admin_agg['spend'] or Decimal('0.00')
@@ -78,6 +146,7 @@ def analytics(request):
         .order_by('-total_spent', '-recipients_total', 'id')
     )
     return render(request, 'console/analytics.html', {
+        'profit': _profit_report(rate), 'rate': rate,
         'admin_spend': admin_spend, 'admin_recipients': admin_agg['recipients'] or 0,
         'user_spend': user_spend, 'user_recipients': user_agg['recipients'] or 0,
         'total_spend': admin_spend + user_spend,
