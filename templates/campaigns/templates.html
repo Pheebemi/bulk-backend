@@ -1,0 +1,51 @@
+{% extends "layout/user_shell.html" %}
+{% block title %}Templates — ReachlySMS{% endblock %}
+{% block page_content %}
+<h1 class="mb-1 text-2xl font-extrabold text-ink">Message templates</h1>
+<p class="mb-6 max-w-2xl text-sm text-muted">Save messages you send often. Personalise them with <code class="rounded bg-surface2 px-1.5 py-0.5 text-xs font-bold">{name}</code>, <code class="rounded bg-surface2 px-1.5 py-0.5 text-xs font-bold">{fullname}</code> or <code class="rounded bg-surface2 px-1.5 py-0.5 text-xs font-bold">{phone}</code> — each contact gets their own version, and a contact with no name reads as "there".</p>
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1.2fr]">
+  <form method="post" class="card h-fit p-5 sm:p-6">
+    {% csrf_token %}
+    {% if editing %}<input type="hidden" name="id" value="{{ editing.pk }}">{% endif %}
+    <h3 class="mb-3 text-base font-bold text-ink">{% if editing %}Edit template{% else %}New template{% endif %}</h3>
+    <label class="text-xs font-bold text-muted">NAME</label>
+    <input type="text" name="name" maxlength="60" required value="{% if posted %}{{ posted.name }}{% else %}{{ editing.name }}{% endif %}" placeholder="e.g. Payment reminder">
+    <label class="mt-4 block text-xs font-bold text-muted">MESSAGE</label>
+    <textarea name="body" id="tpl-body" required class="min-h-[140px]" placeholder="Hi {name}, your order is ready for pickup.">{% if posted %}{{ posted.body }}{% else %}{{ editing.body }}{% endif %}</textarea>
+    <div class="mt-2 flex flex-wrap gap-2">
+      <button type="button" data-insert="{name}" class="rounded-full border border-border px-3 py-1 text-xs font-bold text-accent hover:bg-accent-soft">+ {name}</button>
+      <button type="button" data-insert="{fullname}" class="rounded-full border border-border px-3 py-1 text-xs font-bold text-accent hover:bg-accent-soft">+ {fullname}</button>
+      <button type="button" data-insert="{phone}" class="rounded-full border border-border px-3 py-1 text-xs font-bold text-accent hover:bg-accent-soft">+ {phone}</button>
+    </div>
+    <div class="mt-5 flex gap-2.5">
+      <button class="btn-primary flex-1 py-3">{% if editing %}Save changes{% else %}Save template{% endif %}</button>
+      {% if editing %}<a href="{% url 'web-templates' %}" class="btn-secondary py-3">Cancel</a>{% endif %}
+    </div>
+  </form>
+  <div>
+    <div class="card overflow-hidden">
+      {% for t in templates %}
+      <div class="border-b border-border p-4 last:border-b-0">
+        <div class="mb-1 flex items-center justify-between gap-3">
+          <div class="font-bold text-ink">{{ t.name }}</div>
+          <div class="flex flex-none items-center gap-3 text-xs font-bold">
+            <a href="{% url 'web-campaign-new' %}?template={{ t.pk }}" class="text-accent">Use</a>
+            <a href="?edit={{ t.pk }}" class="text-muted">Edit</a>
+            <form method="post" onsubmit="return confirm('Delete this template?')">{% csrf_token %}<input type="hidden" name="id" value="{{ t.pk }}"><button name="action" value="delete" class="text-danger">Delete</button></form>
+          </div>
+        </div>
+        <p class="whitespace-pre-wrap text-sm text-muted">{{ t.body|truncatechars:240 }}</p>
+      </div>
+      {% empty %}<div class="px-4 py-10 text-center text-sm text-muted">No templates yet — save your first one.</div>{% endfor %}
+    </div>
+  </div>
+</div>
+<script>
+document.querySelectorAll('[data-insert]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var t = document.getElementById('tpl-body'), s = t.selectionStart, e = t.selectionEnd, v = b.dataset.insert;
+    t.value = t.value.slice(0, s) + v + t.value.slice(e); t.focus(); t.selectionStart = t.selectionEnd = s + v.length;
+  });
+});
+</script>
+{% endblock %}

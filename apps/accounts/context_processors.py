@@ -14,6 +14,7 @@ _USER_NAV = [
     ('web-dashboard', 'Dashboard', 'dashboard'),
     ('web-contacts', 'Contacts', 'contacts'),
     ('web-campaigns', 'Campaigns', 'campaign'),
+    ('web-templates', 'Templates', 'campaign'),
     ('web-wallet', 'Wallet', 'wallet'),
     ('web-sender-ids', 'Sender IDs', 'sender'),
 ]

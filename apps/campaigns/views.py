@@ -34,7 +34,7 @@ from .serializers import (
     SenderIDSerializer,
     WalletAdjustSerializer,
 )
-from .utils import count_segments
+from .utils import count_segments, has_merge_fields, render_message
 
 User = get_user_model()
 
@@ -63,6 +63,12 @@ ASYNC_SEND_THRESHOLD = 2000
 # campaign — a real tradeoff, not free; Vercel Pro's configurable
 # maxDuration (up to 300s) would allow raising this safely.
 MAX_CHUNKS_PER_BATCH = 5
+
+# A personalised campaign sends one API call per recipient (each message is
+# different), so it is processed in small steps by the cron tick, and only a
+# handful are sent inline in the request.
+PERSONALISED_CHUNK = 8
+PERSONALISED_SYNC_LIMIT = 5
 
 
 # --- Sender IDs (user) -------------------------------------------------------
@@ -161,9 +167,12 @@ class CampaignListCreateView(generics.ListAPIView):
         # they reach Termii. Nothing is stored in a Termii phonebook.
         if data.get('group_id'):
             group = get_object_or_404(ContactGroup, id=data['group_id'], user=request.user)
-            recipients_numbers = list(group.contacts.values_list('phone_number', flat=True))
+            contact_rows = list(group.contacts.values_list('phone_number', 'first_name', 'last_name'))
+            recipients_numbers = [row[0] for row in contact_rows]
+            names = [[row[1], row[2]] for row in contact_rows]
         else:
             recipients_numbers = list(data['manual_numbers'])
+            names = [['', ''] for _ in recipients_numbers]
         recipient_count = len(recipients_numbers)
 
         if recipient_count == 0:
@@ -186,7 +195,17 @@ class CampaignListCreateView(generics.ListAPIView):
             )
         provider = settings.SMS_PROVIDER
 
-        segments = count_segments(data['message'])
+        personalised = has_merge_fields(data['message'])
+        if personalised:
+            # Every recipient gets their own text. Billing uses the longest
+            # rendered message, so the per-recipient price stays uniform
+            # (and the quote shown up front is never exceeded).
+            segments = max(
+                count_segments(render_message(data['message'], first_name=n[0], last_name=n[1], phone=p))
+                for p, n in zip(recipients_numbers, names)
+            )
+        else:
+            segments = count_segments(data['message'])
         platform_rate = PlatformRate.current()
         rate = platform_rate.rate_for(data['channel'])
         # Per-recipient price is kept separate so a partial send can be
@@ -217,6 +236,7 @@ class CampaignListCreateView(generics.ListAPIView):
             channel=data['channel'],
             recipients=recipients_numbers,
             unit_cost=unit_cost,
+            recipient_names=names if personalised else [],
             unit_provider_cost=Decimal(segments) * platform_rate.cost_for(data['channel']),
             total_recipients=recipient_count,
             total_cost=cost,
@@ -229,7 +249,7 @@ class CampaignListCreateView(generics.ListAPIView):
             # cron tick (ProcessQueuedCampaignsView) starts it at scheduled_at.
             return Response(CampaignSerializer(campaign).data, status=status.HTTP_201_CREATED)
 
-        if recipient_count > ASYNC_SEND_THRESHOLD:
+        if recipient_count > ASYNC_SEND_THRESHOLD or (personalised and recipient_count > PERSONALISED_SYNC_LIMIT):
             # Too big to safely finish inside one request — leave it
             # PROCESSING and let process_campaign_batch (called
             # repeatedly by an external scheduler hitting POST
@@ -256,6 +276,68 @@ class CampaignListCreateView(generics.ListAPIView):
             )
 
         return Response(CampaignSerializer(campaign).data, status=status.HTTP_201_CREATED)
+
+
+def _send_one(campaign: Campaign, number: str, text: str):
+    """One recipient, one provider call, for a personalised message.
+    Returns (response, accepted) — accepted is False when the provider
+    answered but rejected this number (Termii's `submitted` of 0)."""
+    provider = campaign.provider
+    if provider == 'sendchamp':
+        return sendchamp.send_sms([number], campaign.sender_id, text, 'dnd' if campaign.channel == 'dnd' else 'non_dnd'), True
+    if provider == 'kudisms':
+        return kudisms.send_sms([number], campaign.sender_id, text, 'dnd' if campaign.channel == 'dnd' else 'generic'), True
+    response = termii.send_bulk([number], campaign.sender_id, text, campaign.channel)
+    return response, bool(response.get('submitted', 1))
+
+
+def _send_personalised_batch(campaign: Campaign, *, max_chunks: int | None) -> bool:
+    """Same contract as _send_campaign_batch, for a campaign whose message
+    has merge fields: each recipient's message is rendered from their own
+    name and sent individually, PERSONALISED_CHUNK recipients per step."""
+    provider = campaign.provider
+    extract_id = {
+        'sendchamp': _extract_sendchamp_message_id,
+        'kudisms': _extract_kudisms_message_id,
+    }.get(provider, _extract_message_id)
+    numbers, names = campaign.recipients, campaign.recipient_names
+    total = len(numbers)
+
+    logs: list[SMSLog] = []
+    delivered_delta = failed_delta = 0
+    send_error: Exception | None = None
+    i = campaign.next_recipient_index
+    steps = 0
+    while i < total and (max_chunks is None or steps < max_chunks) and not send_error:
+        for k in range(i, min(i + PERSONALISED_CHUNK, total)):
+            first, last = (names[k] + ['', ''])[:2] if k < len(names) else ('', '')
+            text = render_message(campaign.message, first_name=first, last_name=last, phone=numbers[k])
+            try:
+                response, accepted = _send_one(campaign, numbers[k], text)
+            except (TermiiError, SendchampError, KudiSMSError) as exc:
+                # Hard error: same as the bulk path — fail everything left.
+                send_error = exc
+                logs.extend(SMSLog(campaign=campaign, recipient=n, status='FAILED') for n in numbers[k:])
+                failed_delta += total - k
+                i = total
+                break
+            if accepted:
+                logs.append(SMSLog(campaign=campaign, recipient=numbers[k], provider_msg_id=extract_id(response), status='DELIVERED'))
+                delivered_delta += 1
+            else:
+                logs.append(SMSLog(campaign=campaign, recipient=numbers[k], status='FAILED'))
+                failed_delta += 1
+            i = k + 1
+        steps += 1
+
+    SMSLog.objects.bulk_create(logs)
+    campaign.delivered += delivered_delta
+    campaign.failed += failed_delta
+    campaign.next_recipient_index = i
+    if send_error:
+        campaign.provider_error = f'{provider}: {send_error}'
+    campaign.save(update_fields=['delivered', 'failed', 'next_recipient_index', 'provider_error'])
+    return i >= total
 
 
 def _send_campaign_batch(campaign: Campaign, *, max_chunks: int | None) -> bool:
@@ -289,6 +371,9 @@ def _send_campaign_batch(campaign: Campaign, *, max_chunks: int | None) -> bool:
     verified per-recipient result. That partial case does NOT stop the
     loop, unlike a hard error — the next chunk is still attempted.
     """
+    if campaign.recipient_names:
+        return _send_personalised_batch(campaign, max_chunks=max_chunks)
+
     provider = campaign.provider
     recipients_numbers = campaign.recipients
     recipient_count = len(recipients_numbers)
@@ -381,7 +466,8 @@ def _finalize_campaign(campaign: Campaign) -> None:
     campaign.total_cost = Decimal(sent_count) * campaign.unit_cost
     campaign.termii_cost = Decimal(sent_count) * campaign.unit_provider_cost
     campaign.recipients = []
-    campaign.save(update_fields=['status', 'total_cost', 'termii_cost', 'recipients'])
+    campaign.recipient_names = []
+    campaign.save(update_fields=['status', 'total_cost', 'termii_cost', 'recipients', 'recipient_names'])
 
 
 def _extract_message_id(response: dict) -> str | None:

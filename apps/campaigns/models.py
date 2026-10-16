@@ -140,6 +140,10 @@ class Campaign(models.Model):
     # Always equal to total_recipients by the time status leaves
     # PROCESSING.
     next_recipient_index = models.PositiveIntegerField(default=0)
+    # [first_name, last_name] per recipient, parallel to `recipients` — only
+    # filled when the message uses merge fields like {name}, in which case
+    # each recipient gets their own rendered message.
+    recipient_names = models.JSONField(default=list, blank=True)
     # Per-recipient cost, snapshotted at send time — refund math (for
     # whatever wasn't sent) uses this instead of re-reading
     # PlatformRate.current(), so a rate change while a large campaign is
@@ -176,3 +180,21 @@ class SMSLog(models.Model):
     provider_msg_id = models.CharField(max_length=100, blank=True, null=True)
     status = models.CharField(max_length=20, default='PENDING')
     sent_at = models.DateTimeField(auto_now_add=True)
+
+
+class MessageTemplate(models.Model):
+    """A saved message a customer reuses. May contain merge fields:
+    {name}, {fullname}, {phone}."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='message_templates')
+    name = models.CharField(max_length=60)
+    body = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        constraints = [models.UniqueConstraint(fields=['user', 'name'], name='unique_template_name_per_user')]
+
+    def __str__(self):
+        return self.name
