@@ -43,6 +43,8 @@ def login_view(request):
             else:
                 messages.info(request, 'Verify your email to continue — enter the code we just sent.')
             return redirect('web-verify-email')
+        if user.is_staff:
+            return redirect('console-dashboard')
         messages.success(request, 'Welcome back.')
         return redirect('web-dashboard')
     return render(request, 'accounts/login.html', {'form': form})

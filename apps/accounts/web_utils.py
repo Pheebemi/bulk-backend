@@ -53,6 +53,12 @@ def customer_required(view):
             return redirect('web-login')
         if settings.EMAIL_VERIFICATION_REQUIRED and not request.user.email_verified and not request.user.is_staff:
             return redirect('web-verify-email')
+        # Any account can reach customer pages (staff included), and not
+        # every account was created through signup — make sure a wallet
+        # exists instead of 500ing on `user.wallet`.
+        from apps.accounts.models import Wallet
+
+        Wallet.objects.get_or_create(user=request.user)
         return view(request, *args, **kwargs)
 
     return wrapper
