@@ -25,6 +25,7 @@ _CONSOLE_NAV = [
     ('console-approvals', 'Sender IDs', 'sender'),
     ('console-campaigns', 'Campaigns', 'campaign'),
     ('console-contacts', 'Contacts', 'contacts'),
+    ('console-users', 'Users', 'contacts'),
     ('console-wallets', 'User wallets', 'wallet'),
     ('console-send', 'Send campaign', 'campaign'),
 ]

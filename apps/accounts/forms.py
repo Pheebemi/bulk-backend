@@ -20,6 +20,12 @@ class EmailLoginForm(forms.Form):
         if email and password:
             user = authenticate(self._request, username=email, password=password)
             if user is None:
+                # authenticate() also returns None for a blocked (inactive)
+                # account — say so when the password was right, so they
+                # know to contact support rather than retry.
+                blocked = User.objects.filter(email__iexact=email, is_active=False).first()
+                if blocked and blocked.check_password(password):
+                    raise forms.ValidationError('This account has been suspended. Please contact support.')
                 raise forms.ValidationError('Invalid email or password.')
             cleaned['user'] = user
         return cleaned

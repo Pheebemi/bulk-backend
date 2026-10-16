@@ -1,0 +1,32 @@
+{% extends "layout/admin_shell.html" %}
+{% block title %}Users — ReachlySMS Admin{% endblock %}
+{% block page_content %}
+<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+  <div><h1 class="text-2xl font-extrabold text-ink">Users</h1>
+  <p class="text-sm text-muted">{{ total }} customer{{ total|pluralize }}{% if blocked %} · {{ blocked }} blocked{% endif %}</p></div>
+  <a href="{% url 'console-users-export' %}?q={{ q|urlencode }}&status={{ status }}" class="btn-secondary">Export CSV</a>
+</div>
+<form method="get" class="mb-4 flex flex-wrap gap-2">
+  <input type="text" name="q" value="{{ q }}" placeholder="Search by name, email or phone…" class="!mt-0 max-w-sm flex-1">
+  <select name="status" class="!mt-0 !w-36" onchange="this.form.submit()">
+    <option value="">All users</option>
+    <option value="active" {% if status == 'active' %}selected{% endif %}>Active</option>
+    <option value="blocked" {% if status == 'blocked' %}selected{% endif %}>Blocked</option>
+  </select>
+  <button class="btn-primary">Search</button>
+</form>
+<div class="card overflow-x-auto"><div class="min-w-[760px]">
+  <div class="grid grid-cols-[1.6fr_0.8fr_0.8fr_0.7fr_0.8fr_0.7fr] border-b border-border px-4 py-3 text-xs font-bold text-muted"><span>USER</span><span>JOINED</span><span>BALANCE</span><span>CAMPAIGNS</span><span>SPENT</span><span>STATUS</span></div>
+  {% for u in page %}
+  <a href="{% url 'console-user-detail' u.pk %}" class="grid grid-cols-[1.6fr_0.8fr_0.8fr_0.7fr_0.8fr_0.7fr] items-center border-b border-border px-4 py-3.5 text-sm last:border-b-0 hover:bg-bg">
+    <span class="min-w-0"><div class="truncate font-semibold">{{ u.full_name|default:u.email }}</div><div class="truncate text-xs text-muted">{{ u.email }}</div></span>
+    <span class="text-muted">{{ u.date_joined|date:"M j, Y" }}</span>
+    <span class="font-semibold">₦{{ u.wallet.balance|default:0|floatformat:2 }}</span>
+    <span class="text-muted">{{ u.campaigns_count }}</span>
+    <span class="text-muted">₦{{ u.total_spent|floatformat:2 }}</span>
+    <span>{% if u.is_active %}<span class="rounded-full bg-success/10 px-2.5 py-1 text-xs font-bold text-success">Active</span>{% else %}<span class="rounded-full bg-danger/10 px-2.5 py-1 text-xs font-bold text-danger">Blocked</span>{% endif %}</span>
+  </a>
+  {% empty %}<div class="px-4 py-8 text-center text-sm text-muted">No users found.</div>{% endfor %}
+</div></div>
+{% include "includes/pagination.html" %}
+{% endblock %}

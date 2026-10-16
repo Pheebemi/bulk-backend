@@ -12,7 +12,12 @@ from django.db.models import Count, Q, Sum, Value
 from django.db.models.functions import Coalesce, TruncDate
 from django.utils import timezone
 from datetime import timedelta
+import csv
+from datetime import date
+
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from apps.accounts.forms import EmailLoginForm
 from apps.accounts.models import Wallet, WalletTransaction
@@ -269,3 +274,118 @@ def approvals(request):
         'page': Paginator(rows, 25).get_page(request.GET.get('page')), 'vis': vis,
         'providers': SenderID.PROVIDER_CHOICES, 'statuses': SenderID.PLATFORM_STATUS, 'visibilities': SenderID.VISIBILITY_CHOICES,
     })
+
+
+# --- Users --------------------------------------------------------------------
+
+
+def _customers_qs(q='', status=''):
+    qs = (
+        User.objects.filter(is_staff=False)
+        .select_related('wallet')
+        .annotate(
+            campaigns_count=Count('campaigns', filter=Q(campaigns__is_admin_campaign=False), distinct=True),
+            total_spent=Coalesce(Sum('campaigns__total_cost', filter=Q(campaigns__is_admin_campaign=False)), Value(Decimal('0.00'))),
+        )
+        .order_by('-date_joined')
+    )
+    if q:
+        qs = qs.filter(Q(email__icontains=q) | Q(full_name__icontains=q) | Q(phone_number__icontains=q))
+    if status == 'blocked':
+        qs = qs.filter(is_active=False)
+    elif status == 'active':
+        qs = qs.filter(is_active=True)
+    return qs
+
+
+@staff_required
+def users(request):
+    q = request.GET.get('q', '').strip()
+    status = request.GET.get('status', '')
+    qs = _customers_qs(q, status)
+    return render(request, 'console/users.html', {
+        'page': Paginator(qs, 25).get_page(request.GET.get('page')), 'q': q, 'status': status,
+        'total': User.objects.filter(is_staff=False).count(),
+        'blocked': User.objects.filter(is_staff=False, is_active=False).count(),
+    })
+
+
+@staff_required
+def user_detail(request, pk):
+    customer = get_object_or_404(User, pk=pk, is_staff=False)
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'block':
+            customer.is_active = False
+            messages.success(request, f'{customer.email} is blocked and signed out. They can no longer log in or send.')
+        elif action == 'unblock':
+            customer.is_active = True
+            messages.success(request, f'{customer.email} is active again.')
+        customer.save(update_fields=['is_active'])
+        return redirect('console-user-detail', pk=pk)
+
+    wallet, _ = Wallet.objects.get_or_create(user=customer)
+    camps = Campaign.objects.filter(user=customer, is_admin_campaign=False)
+    agg = camps.aggregate(spent=Sum('total_cost'), recipients=Sum('delivered'))
+    return render(request, 'console/user_detail.html', {
+        'c': customer, 'wallet': wallet,
+        'campaigns_count': camps.count(), 'spent': _money(agg['spent']), 'delivered': agg['recipients'] or 0,
+        'recent': camps.order_by('-created_at')[:10],
+        'history': WalletTransaction.objects.filter(user=customer).order_by('-created_at')[:10],
+        'sender_ids': SenderID.objects.filter(user=customer).order_by('-created_at'),
+    })
+
+
+def _csv_response(filename):
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@staff_required
+def export_users(request):
+    response = _csv_response(f'users-{date.today().isoformat()}.csv')
+    writer = csv.writer(response)
+    writer.writerow(['Email', 'Name', 'Phone', 'Joined', 'Verified', 'Status', 'Balance (NGN)', 'Campaigns', 'Total spent (NGN)'])
+    for u in _customers_qs(request.GET.get('q', '').strip(), request.GET.get('status', '')):
+        writer.writerow([
+            u.email, u.full_name, u.phone_number, timezone.localtime(u.date_joined).strftime('%Y-%m-%d'),
+            'yes' if u.email_verified else 'no', 'active' if u.is_active else 'blocked',
+            getattr(getattr(u, 'wallet', None), 'balance', 0), u.campaigns_count, u.total_spent,
+        ])
+    return response
+
+
+def _parse_day(value):
+    try:
+        return date.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+
+
+@staff_required
+def export_revenue(request):
+    """One row per customer campaign that delivered something, with revenue,
+    provider cost and profit; a totals row closes the file."""
+    start, end = _parse_day(request.GET.get('from')), _parse_day(request.GET.get('to'))
+    qs = Campaign.objects.filter(is_admin_campaign=False, delivered__gt=0).select_related('user').order_by('created_at')
+    if start:
+        qs = qs.filter(created_at__date__gte=start)
+    if end:
+        qs = qs.filter(created_at__date__lte=end)
+    label = f'{start or "start"}_to_{end or "today"}'
+    response = _csv_response(f'revenue-{label}.csv')
+    writer = csv.writer(response)
+    writer.writerow(['Date', 'Campaign', 'Customer', 'Sender ID', 'Route', 'Delivered', 'Revenue (NGN)', 'Provider cost (NGN)', 'Profit (NGN)'])
+    revenue = cost = Decimal('0.00')
+    delivered = 0
+    for c in qs:
+        profit = c.total_cost - c.termii_cost
+        revenue, cost, delivered = revenue + c.total_cost, cost + c.termii_cost, delivered + c.delivered
+        writer.writerow([
+            timezone.localtime(c.created_at).strftime('%Y-%m-%d %H:%M'), c.pk, c.user.email, c.sender_id,
+            c.channel.upper(), c.delivered, c.total_cost, c.termii_cost, profit,
+        ])
+    writer.writerow([])
+    writer.writerow(['TOTAL', '', '', '', '', delivered, revenue, cost, revenue - cost])
+    return response

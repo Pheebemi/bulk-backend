@@ -1,0 +1,53 @@
+{% extends "layout/admin_shell.html" %}
+{% block title %}{{ c.full_name|default:c.email }} — ReachlySMS Admin{% endblock %}
+{% block page_content %}
+<a href="{% url 'console-users' %}" class="mb-4 inline-block text-sm font-bold text-accent">&larr; All users</a>
+<div class="mb-6 flex flex-wrap items-start justify-between gap-4">
+  <div>
+    <div class="flex flex-wrap items-center gap-3"><h1 class="text-2xl font-extrabold text-ink">{{ c.full_name|default:c.email }}</h1>
+      {% if c.is_active %}<span class="rounded-full bg-success/10 px-2.5 py-1 text-xs font-bold text-success">Active</span>{% else %}<span class="rounded-full bg-danger/10 px-2.5 py-1 text-xs font-bold text-danger">Blocked</span>{% endif %}</div>
+    <p class="mt-1 text-sm text-muted">{{ c.email }}{% if c.phone_number %} · {{ c.phone_number }}{% endif %} · joined {{ c.date_joined|date:"j M Y" }} · email {% if c.email_verified %}verified{% else %}not verified{% endif %}</p>
+  </div>
+  <div class="flex gap-2">
+    <a href="{% url 'console-wallets' %}?user={{ c.pk }}" class="btn-secondary">Adjust wallet</a>
+    <form method="post" onsubmit="return confirm('{% if c.is_active %}Block this user? They will be signed out and cannot log in or send.{% else %}Unblock this user?{% endif %}')">
+      {% csrf_token %}
+      {% if c.is_active %}<button name="action" value="block" class="rounded-lg bg-danger px-4 py-2.5 text-sm font-bold text-white">Block user</button>
+      {% else %}<button name="action" value="unblock" class="btn-primary">Unblock user</button>{% endif %}
+    </form>
+  </div>
+</div>
+<div class="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+  <div class="card p-4"><div class="text-xs font-bold text-muted">WALLET BALANCE</div><div class="text-xl font-extrabold">₦{{ wallet.balance|floatformat:2 }}</div></div>
+  <div class="card p-4"><div class="text-xs font-bold text-muted">TOTAL SPENT</div><div class="text-xl font-extrabold">₦{{ spent|floatformat:2 }}</div></div>
+  <div class="card p-4"><div class="text-xs font-bold text-muted">CAMPAIGNS</div><div class="text-xl font-extrabold">{{ campaigns_count }}</div></div>
+  <div class="card p-4"><div class="text-xs font-bold text-muted">SMS DELIVERED</div><div class="text-xl font-extrabold">{{ delivered }}</div></div>
+</div>
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+  <div>
+    <h3 class="mb-3 text-base font-bold text-ink">Recent campaigns</h3>
+    <div class="card overflow-hidden">
+      {% for k in recent %}
+      <div class="flex items-center justify-between gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0">
+        <span class="min-w-0"><div class="truncate font-semibold">{{ k.message|truncatechars:40 }}</div><div class="text-xs text-muted">{{ k.sender_id }} · {{ k.total_recipients }} recipients · {{ k.created_at|date:"M j, g:i A" }}</div></span>
+        <span class="flex flex-none flex-col items-end gap-1"><span class="font-bold">₦{{ k.total_cost|floatformat:2 }}</span>{% include "includes/status_badge.html" with status=k.status %}</span>
+      </div>
+      {% empty %}<div class="px-4 py-5 text-sm text-muted">No campaigns yet.</div>{% endfor %}
+    </div>
+  </div>
+  <div>
+    <h3 class="mb-3 text-base font-bold text-ink">Wallet history</h3>
+    <div class="card mb-6 overflow-hidden">
+      {% for h in history %}
+      <div class="flex justify-between gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0"><span class="text-muted">{{ h.description }}<div class="text-xs">{{ h.created_at|date:"M j, g:i A" }}</div></span><span class="font-bold {% if h.amount >= 0 %}text-success{% else %}text-danger{% endif %}">{% if h.amount >= 0 %}+{% endif %}₦{{ h.amount|floatformat:2 }}</span></div>
+      {% empty %}<div class="px-4 py-5 text-sm text-muted">No wallet activity.</div>{% endfor %}
+    </div>
+    <h3 class="mb-3 text-base font-bold text-ink">Sender IDs</h3>
+    <div class="card overflow-hidden">
+      {% for s in sender_ids %}
+      <div class="flex items-center justify-between border-b border-border px-4 py-3 text-sm last:border-b-0"><span class="font-bold">{{ s.name }}</span><span class="capitalize text-muted">{{ s.platform_status }}</span></div>
+      {% empty %}<div class="px-4 py-5 text-sm text-muted">None requested.</div>{% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}
